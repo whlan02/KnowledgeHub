@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, FolderOpen, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon } from 'lucide-react'
+import { BookOpen, ChevronDown, FolderOpen, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
 import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
@@ -11,16 +11,31 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
+import { formatRecentOpenedAt } from '@/lib/format-recent'
 import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
-  const { notes, folderLabel, source, pickerSupported, openFolder, resetToBundled } = useNotes()
+  const {
+    notes,
+    folderLabel,
+    source,
+    pickerSupported,
+    recentFolders,
+    activeFolderId,
+    openFolder,
+    openRecentFolder,
+    removeRecentFolderEntry,
+    clearRecentFolderHistory,
+    resetToBundled,
+  } = useNotes()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -39,6 +54,46 @@ export function AppShell() {
         console.error(err)
         window.alert(t('folderPickFailed'))
       }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onOpenRecent = async (id: string) => {
+    try {
+      setBusy(true)
+      await openRecentFolder(id)
+      navigate('/', { replace: true })
+    } catch (err) {
+      const message = (err as Error)?.message
+      if (message === 'RECENT_FOLDER_MISSING') {
+        window.alert(t('recentFolderMissing'))
+      } else if (message === 'RECENT_FOLDER_DENIED') {
+        window.alert(t('recentFolderDenied'))
+      } else if ((err as Error)?.name !== 'AbortError') {
+        console.error(err)
+        window.alert(t('folderPickFailed'))
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onRemoveRecent = async (id: string) => {
+    try {
+      setBusy(true)
+      await removeRecentFolderEntry(id)
+      if (activeFolderId === id) navigate('/', { replace: true })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onClearRecent = async () => {
+    try {
+      setBusy(true)
+      await clearRecentFolderHistory()
+      navigate('/', { replace: true })
     } finally {
       setBusy(false)
     }
@@ -74,16 +129,83 @@ export function AppShell() {
         </div>
         <div className="ml-auto flex items-center gap-1">
           {pickerSupported && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy}
-              onClick={() => void onOpenFolder()}
-              className="gap-1.5"
-            >
-              <FolderOpen className="size-3.5" />
-              {t('openFolder')}
-            </Button>
+            <DropdownMenu>
+              <div className="flex items-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => void onOpenFolder()}
+                  className="gap-1.5 rounded-r-none border-r-0 pr-2"
+                >
+                  <FolderOpen className="size-3.5" />
+                  {t('openFolder')}
+                </Button>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    className="rounded-l-none px-1.5"
+                    aria-label={t('recentFolders')}
+                  >
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </div>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuItem onClick={() => void onOpenFolder()}>
+                  <FolderOpen className="mr-2 size-4 opacity-70" />
+                  {t('openFolderChoose')}
+                </DropdownMenuItem>
+                {recentFolders.length > 0 && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{t('recentFolders')}</DropdownMenuLabel>
+                    {recentFolders.map((entry) => (
+                      <DropdownMenuItem
+                        key={entry.id}
+                        className="group flex items-center gap-2 pr-1"
+                        onClick={() => void onOpenRecent(entry.id)}
+                      >
+                        <FolderOpen
+                          className={cn(
+                            'size-4 shrink-0 opacity-70',
+                            entry.id === activeFolderId && source === 'folder' && 'text-primary',
+                          )}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium leading-tight">{entry.name}</div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {formatRecentOpenedAt(entry.openedAt, i18n.language)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="rounded-sm p-1 opacity-0 transition-opacity hover:bg-muted group-focus-within:opacity-100 group-hover:opacity-100"
+                          aria-label={t('removeFromRecent')}
+                          title={t('removeFromRecent')}
+                          onPointerDown={(e) => e.preventDefault()}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void onRemoveRecent(entry.id)
+                          }}
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-muted-foreground"
+                      onClick={() => void onClearRecent()}
+                    >
+                      {t('clearRecentFolders')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {source === 'folder' && (
             <Button

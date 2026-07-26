@@ -12,9 +12,14 @@ import type { Note } from '@/lib/fs-notes'
 import { isDirectoryPickerSupported, scanDirectoryHandle } from '@/lib/fs-notes'
 import {
   clearDirectoryHandle,
+  clearRecentFolders,
   ensureReadPermission,
+  getRecentFolderHandle,
+  listRecentFolders,
   loadDirectoryHandle,
+  removeRecentFolder,
   saveDirectoryHandle,
+  type RecentFolderEntry,
 } from '@/lib/idb-handles'
 
 type NotesContextValue = {
@@ -22,7 +27,12 @@ type NotesContextValue = {
   folderLabel: string
   source: 'bundled' | 'folder'
   pickerSupported: boolean
+  recentFolders: RecentFolderEntry[]
+  activeFolderId: string | null
   openFolder: () => Promise<void>
+  openRecentFolder: (id: string) => Promise<void>
+  removeRecentFolderEntry: (id: string) => Promise<void>
+  clearRecentFolderHistory: () => Promise<void>
   resetToBundled: () => Promise<void>
   resolveAssetUrl: (fromNotePath: string, src: string) => Promise<string | null>
   notesPaths: Set<string>
@@ -40,6 +50,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [source, setSource] = useState<'bundled' | 'folder'>('bundled')
   const [fileHandles, setFileHandles] = useState<Map<string, FileSystemFileHandle>>(new Map())
   const [blobCache] = useState(() => new Map<string, string>())
+  const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([])
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
+
+  const refreshRecentFolders = useCallback(async () => {
+    if (!isDirectoryPickerSupported()) return
+    try {
+      const list = await listRecentFolders()
+      setRecentFolders(list)
+    } catch {
+      setRecentFolders([])
+    }
+  }, [])
 
   const applyScanned = useCallback(
     async (dirHandle: FileSystemDirectoryHandle) => {
@@ -50,15 +72,18 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFileHandles(scanned.fileHandles)
       setFolderLabel(scanned.folderName)
       setSource('folder')
-      await saveDirectoryHandle(dirHandle)
+      const id = await saveDirectoryHandle(dirHandle)
+      setActiveFolderId(id)
+      await refreshRecentFolders()
     },
-    [blobCache],
+    [blobCache, refreshRecentFolders],
   )
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       if (!isDirectoryPickerSupported()) return
+      await refreshRecentFolders()
       try {
         const handle = await loadDirectoryHandle()
         if (!handle || cancelled) return
@@ -72,7 +97,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [applyScanned])
+  }, [applyScanned, refreshRecentFolders])
 
   const openFolder = useCallback(async () => {
     if (!isDirectoryPickerSupported()) {
@@ -82,6 +107,52 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     await applyScanned(handle)
   }, [applyScanned])
 
+  const openRecentFolder = useCallback(
+    async (id: string) => {
+      const handle = await getRecentFolderHandle(id)
+      if (!handle) {
+        await removeRecentFolder(id)
+        await refreshRecentFolders()
+        throw new Error('RECENT_FOLDER_MISSING')
+      }
+      const ok = await ensureReadPermission(handle)
+      if (!ok) throw new Error('RECENT_FOLDER_DENIED')
+      await applyScanned(handle)
+    },
+    [applyScanned, refreshRecentFolders],
+  )
+
+  const removeRecentFolderEntry = useCallback(
+    async (id: string) => {
+      await removeRecentFolder(id)
+      if (activeFolderId === id) {
+        for (const url of blobCache.values()) URL.revokeObjectURL(url)
+        blobCache.clear()
+        setNotes(cloneBundledNotes())
+        setFileHandles(new Map())
+        setFolderLabel(bundledRoot)
+        setSource('bundled')
+        setActiveFolderId(null)
+      }
+      await refreshRecentFolders()
+    },
+    [activeFolderId, blobCache, refreshRecentFolders],
+  )
+
+  const clearRecentFolderHistory = useCallback(async () => {
+    await clearRecentFolders()
+    if (source === 'folder') {
+      for (const url of blobCache.values()) URL.revokeObjectURL(url)
+      blobCache.clear()
+      setNotes(cloneBundledNotes())
+      setFileHandles(new Map())
+      setFolderLabel(bundledRoot)
+      setSource('bundled')
+    }
+    setActiveFolderId(null)
+    await refreshRecentFolders()
+  }, [blobCache, refreshRecentFolders, source])
+
   const resetToBundled = useCallback(async () => {
     for (const url of blobCache.values()) URL.revokeObjectURL(url)
     blobCache.clear()
@@ -89,6 +160,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     setFileHandles(new Map())
     setFolderLabel(bundledRoot)
     setSource('bundled')
+    setActiveFolderId(null)
     await clearDirectoryHandle()
   }, [blobCache])
 
@@ -142,12 +214,17 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       folderLabel,
       source,
       pickerSupported: isDirectoryPickerSupported(),
+      recentFolders,
+      activeFolderId,
       openFolder,
+      openRecentFolder,
+      removeRecentFolderEntry,
+      clearRecentFolderHistory,
       resetToBundled,
       resolveAssetUrl,
       notesPaths,
     }),
-    [notes, folderLabel, source, openFolder, resetToBundled, resolveAssetUrl, notesPaths],
+    [notes, folderLabel, source, openFolder, openRecentFolder, removeRecentFolderEntry, clearRecentFolderHistory, resetToBundled, resolveAssetUrl, notesPaths, recentFolders, activeFolderId],
   )
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>
