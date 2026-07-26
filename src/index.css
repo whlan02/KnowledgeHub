@@ -231,3 +231,42 @@
 .markdown-body del {
   color: var(--muted-foreground);
 }
+
+/* Compact Markdown inside link hover preview windows */
+.markdown-preview-body {
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.markdown-preview-body h1 {
+  font-size: 1.25rem;
+  margin: 0 0 0.6rem;
+}
+
+.markdown-preview-body h2 {
+  font-size: 1.05rem;
+  margin: 1rem 0 0.45rem;
+  padding-bottom: 0.2rem;
+}
+
+.markdown-preview-body h3,
+.markdown-preview-body h4 {
+  font-size: 0.95rem;
+  margin: 0.85rem 0 0.35rem;
+}
+
+.markdown-preview-body p,
+.markdown-preview-body ul,
+.markdown-preview-body ol {
+  margin: 0.45rem 0;
+}
+
+.markdown-preview-body pre {
+  padding: 0.55rem 0.7rem;
+  margin: 0.55rem 0;
+  border-radius: 0.45rem;
+}
+
+.markdown-preview-body img {
+  margin: 0.55rem 0;
+}

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Components } from 'react-markdown'
 import { encodeNotePath, resolveNoteLink } from '@/lib/utils'
 import { useNotes } from '@/components/notes-provider'
+import { LinkPreviewAnchor } from '@/components/link-preview-anchor'
 
 function MarkdownImage({
   src = '',
@@ -43,16 +44,22 @@ export function MarkdownView({
   notePath: string
 }) {
   const navigate = useNavigate()
-  const { notesPaths, resolveAssetUrl } = useNotes()
+  const { notes, notesPaths, resolveAssetUrl } = useNotes()
 
   const components = useMemo<Components>(
     () => ({
-      a({ href = '', children, ...props }) {
+      a({ href = '', children, className, ...props }) {
         if (href.startsWith('#')) {
           return (
-            <a href={href} {...props}>
+            <LinkPreviewAnchor
+              href={href}
+              notePath={notePath}
+              notes={notes}
+              className={className}
+              {...props}
+            >
               {children}
-            </a>
+            </LinkPreviewAnchor>
           )
         }
 
@@ -60,20 +67,25 @@ export function MarkdownView({
         if (resolved) {
           const exists = notesPaths.has(resolved)
           return (
-            <a
+            <LinkPreviewAnchor
               {...props}
               href={`/n/${encodeNotePath(resolved)}`}
-              onClick={(e) => {
+              previewHref={href}
+              notePath={notePath}
+              notes={notes}
+              className={className}
+              missingInternal={!exists}
+              title={exists ? undefined : `Missing: ${resolved}`}
+              onNavigate={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
                 if (exists) {
                   navigate(`/n/${encodeNotePath(resolved)}`)
                 }
               }}
-              title={exists ? undefined : `Missing: ${resolved}`}
             >
               {children}
-            </a>
+            </LinkPreviewAnchor>
           )
         }
 
@@ -82,6 +94,7 @@ export function MarkdownView({
           <a
             {...props}
             href={href}
+            className={className}
             target={isExternal ? '_blank' : undefined}
             rel={isExternal ? 'noreferrer' : undefined}
           >
@@ -99,7 +112,7 @@ export function MarkdownView({
         )
       },
     }),
-    [navigate, notePath, notesPaths, resolveAssetUrl],
+    [navigate, notePath, notes, notesPaths, resolveAssetUrl],
   )
 
   return (

@@ -31,6 +31,8 @@ const resources = {
       recentFolderDenied: '未获得读取权限，无法打开该文件夹。',
       resetFolder: '恢复示例笔记',
       folderPickFailed: '无法打开文件夹，请用 Chrome / Edge 重试',
+      linkPreviewMissing: '该笔记不存在或尚未被扫描到',
+      linkPreviewSectionMissing: '未找到对应标题段落',
     },
   },
   en: {
@@ -62,6 +64,8 @@ const resources = {
       recentFolderDenied: 'Read permission was not granted for that folder.',
       resetFolder: 'Reset to sample notes',
       folderPickFailed: 'Could not open folder. Try Chrome or Edge.',
+      linkPreviewMissing: 'This note is missing or not indexed yet',
+      linkPreviewSectionMissing: 'Could not find that heading section',
     },
   },
 }
