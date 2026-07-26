@@ -104,7 +104,12 @@ export function MarkdownView({
 
   return (
     <article className="markdown-body mx-auto max-w-3xl px-6 py-10 pb-24">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]} components={components}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSlug]}
+        skipHtml
+        components={components}
+      >
         {content}
       </ReactMarkdown>
     </article>
