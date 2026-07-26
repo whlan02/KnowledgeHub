@@ -26,6 +26,31 @@ export type ScannedFolder = {
   dirHandle: FileSystemDirectoryHandle
 }
 
+/** Cheap change detection for polling (path + size + mtime, all files). */
+export async function fingerprintDirectoryHandle(
+  dirHandle: FileSystemDirectoryHandle,
+): Promise<string> {
+  const parts: string[] = []
+
+  async function walk(dir: FileSystemDirectoryHandle, prefix: string) {
+    for await (const entry of dir.values()) {
+      if (entry.kind === 'directory') {
+        if (IGNORE_DIRS.has(entry.name) || entry.name.startsWith('.')) continue
+        await walk(entry, prefix ? `${prefix}/${entry.name}` : entry.name)
+        continue
+      }
+
+      const rel = prefix ? `${prefix}/${entry.name}` : entry.name
+      const file = await entry.getFile()
+      parts.push(`${rel}\t${file.lastModified}\t${file.size}`)
+    }
+  }
+
+  await walk(dirHandle, '')
+  parts.sort()
+  return parts.join('\n')
+}
+
 export async function scanDirectoryHandle(
   dirHandle: FileSystemDirectoryHandle,
 ): Promise<ScannedFolder> {

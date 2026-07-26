@@ -102,13 +102,13 @@ export function notesPlugin(options: NotesPluginOptions): Plugin {
       server.middlewares.use(notesAssetMiddleware(root))
       server.watcher.add(root)
       server.watcher.on('all', (_event, file) => {
-        if (!file.endsWith('.md')) return
         const rel = path.relative(root, file)
         if (rel.startsWith('..') || shouldIgnore(rel)) return
+        if (!file.toLowerCase().endsWith('.md')) return
         const mod = server.moduleGraph.getModuleById(RESOLVED_VIRTUAL_ID)
         if (mod) {
           server.moduleGraph.invalidateModule(mod)
-          server.ws.send({ type: 'full-reload' })
+          server.ws.send({ type: 'custom', event: 'knowledgehub:notes-update' })
         }
       })
     },

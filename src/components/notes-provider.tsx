@@ -4,12 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 import bundledNotes, { notesRoot as bundledRoot } from 'virtual:notes'
 import type { Note } from '@/lib/fs-notes'
-import { isDirectoryPickerSupported, scanDirectoryHandle } from '@/lib/fs-notes'
+import {
+  fingerprintDirectoryHandle,
+  isDirectoryPickerSupported,
+  scanDirectoryHandle,
+} from '@/lib/fs-notes'
 import {
   clearDirectoryHandle,
   clearRecentFolders,
@@ -42,6 +47,9 @@ type NotesContextValue = {
 
 const NotesContext = createContext<NotesContextValue | null>(null)
 
+/** How often to check an opened local folder for file changes. */
+const FOLDER_POLL_MS = 1500
+
 function cloneBundledNotes(): Note[] {
   return bundledNotes.map((n) => ({ ...n }))
 }
@@ -55,6 +63,10 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([])
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
+  const folderFingerprintRef = useRef('')
+  const sourceRef = useRef(source)
+  sourceRef.current = source
 
   const refreshRecentFolders = useCallback(async () => {
     if (!isDirectoryPickerSupported()) return
@@ -75,12 +87,33 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFileHandles(scanned.fileHandles)
       setFolderLabel(scanned.folderName)
       setSource('folder')
+      dirHandleRef.current = scanned.dirHandle
+      folderFingerprintRef.current = await fingerprintDirectoryHandle(scanned.dirHandle)
       const id = await saveDirectoryHandle(dirHandle)
       setActiveFolderId(id)
       await refreshRecentFolders()
     },
     [blobCache, refreshRecentFolders],
   )
+
+  const resyncOpenFolder = useCallback(async () => {
+    const handle = dirHandleRef.current
+    if (!handle || sourceRef.current !== 'folder') return
+    try {
+      const nextFp = await fingerprintDirectoryHandle(handle)
+      if (nextFp === folderFingerprintRef.current) return
+      folderFingerprintRef.current = nextFp
+      const scanned = await scanDirectoryHandle(handle)
+      for (const url of blobCache.values()) URL.revokeObjectURL(url)
+      blobCache.clear()
+      setNotes(scanned.notes)
+      setFileHandles(scanned.fileHandles)
+      setFolderLabel(scanned.folderName)
+      dirHandleRef.current = scanned.dirHandle
+    } catch {
+      // Ignore transient read errors while files are being saved.
+    }
+  }, [blobCache])
 
   useEffect(() => {
     let cancelled = false
@@ -103,6 +136,41 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [applyScanned, refreshRecentFolders])
+
+  useEffect(() => {
+    if (source !== 'folder' || !dirHandleRef.current) return
+
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return
+      void resyncOpenFolder()
+    }
+
+    const id = window.setInterval(tick, FOLDER_POLL_MS)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void resyncOpenFolder()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [source, activeFolderId, resyncOpenFolder])
+
+  useEffect(() => {
+    if (!import.meta.hot) return
+
+    const onBundledNotesUpdate = async () => {
+      if (sourceRef.current !== 'bundled') return
+      const mod = await import('virtual:notes')
+      setNotes(mod.default.map((n) => ({ ...n })))
+      setFolderLabel(mod.notesRoot)
+    }
+
+    import.meta.hot.on('knowledgehub:notes-update', onBundledNotesUpdate)
+    return () => {
+      import.meta.hot?.off('knowledgehub:notes-update', onBundledNotesUpdate)
+    }
+  }, [])
 
   const openFolder = useCallback(async () => {
     if (!isDirectoryPickerSupported()) {
@@ -138,6 +206,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setFolderLabel(bundledRoot)
         setSource('bundled')
         setActiveFolderId(null)
+        dirHandleRef.current = null
+        folderFingerprintRef.current = ''
       }
       await refreshRecentFolders()
     },
@@ -153,6 +223,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFileHandles(new Map())
       setFolderLabel(bundledRoot)
       setSource('bundled')
+      dirHandleRef.current = null
+      folderFingerprintRef.current = ''
     }
     setActiveFolderId(null)
     await refreshRecentFolders()
@@ -166,6 +238,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     setFolderLabel(bundledRoot)
     setSource('bundled')
     setActiveFolderId(null)
+    dirHandleRef.current = null
+    folderFingerprintRef.current = ''
     await clearDirectoryHandle()
   }, [blobCache])
 
