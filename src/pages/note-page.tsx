@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { decodeNotePath } from '@/lib/utils'
 import { extractToc } from '@/lib/toc'
 import { useNotes } from '@/components/notes-provider'
+import { saveLastLocation } from '@/lib/last-location'
 import { MarkdownView } from '@/components/markdown-view'
 import { TableOfContents } from '@/components/table-of-contents'
 
 export function NotePage() {
   const { t } = useTranslation()
-  const { notes } = useNotes()
+  const { notes, source, activeFolderId } = useNotes()
   const params = useParams()
   const splat = params['*'] ?? ''
   const notePath = decodeNotePath(splat)
@@ -27,6 +28,15 @@ export function NotePage() {
       })
     }
   }, [notePath, scrollEl])
+
+  useEffect(() => {
+    if (!note) return
+    saveLastLocation({
+      source,
+      folderId: activeFolderId,
+      notePath: note.path,
+    })
+  }, [note, source, activeFolderId])
 
   if (!note) {
     return (

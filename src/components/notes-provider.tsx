@@ -26,6 +26,8 @@ type NotesContextValue = {
   notes: Note[]
   folderLabel: string
   source: 'bundled' | 'folder'
+  /** False until the initial folder restore attempt finishes (avoids wrong home redirect). */
+  ready: boolean
   pickerSupported: boolean
   recentFolders: RecentFolderEntry[]
   activeFolderId: string | null
@@ -52,6 +54,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [blobCache] = useState(() => new Map<string, string>())
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([])
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
 
   const refreshRecentFolders = useCallback(async () => {
     if (!isDirectoryPickerSupported()) return
@@ -82,9 +85,9 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      if (!isDirectoryPickerSupported()) return
-      await refreshRecentFolders()
       try {
+        if (!isDirectoryPickerSupported()) return
+        await refreshRecentFolders()
         const handle = await loadDirectoryHandle()
         if (!handle || cancelled) return
         const ok = await ensureReadPermission(handle)
@@ -92,6 +95,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await applyScanned(handle)
       } catch {
         // Ignore failures when restoring a previously granted folder handle.
+      } finally {
+        if (!cancelled) setReady(true)
       }
     })()
     return () => {
@@ -213,6 +218,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       notes,
       folderLabel,
       source,
+      ready,
       pickerSupported: isDirectoryPickerSupported(),
       recentFolders,
       activeFolderId,
@@ -224,7 +230,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       resolveAssetUrl,
       notesPaths,
     }),
-    [notes, folderLabel, source, openFolder, openRecentFolder, removeRecentFolderEntry, clearRecentFolderHistory, resetToBundled, resolveAssetUrl, notesPaths, recentFolders, activeFolderId],
+    [notes, folderLabel, source, ready, openFolder, openRecentFolder, removeRecentFolderEntry, clearRecentFolderHistory, resetToBundled, resolveAssetUrl, notesPaths, recentFolders, activeFolderId],
   )
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>
