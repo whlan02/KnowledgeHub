@@ -13,6 +13,7 @@ import type { Note } from '@/lib/fs-notes'
 import {
   fingerprintDirectoryHandle,
   isDirectoryPickerSupported,
+  readFileHandleText,
   scanDirectoryHandle,
 } from '@/lib/fs-notes'
 import {
@@ -41,6 +42,8 @@ type NotesContextValue = {
   removeRecentFolderEntry: (id: string) => Promise<void>
   clearRecentFolderHistory: () => Promise<void>
   resetToBundled: () => Promise<void>
+  /** Load markdown body for a note path (cached after first read). */
+  loadNoteContent: (notePath: string) => Promise<string | null>
   resolveAssetUrl: (fromNotePath: string, src: string) => Promise<string | null>
   notesPaths: Set<string>
 }
@@ -66,7 +69,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
   const folderFingerprintRef = useRef('')
   const sourceRef = useRef(source)
+  const notesRef = useRef(notes)
+  const fileHandlesRef = useRef(fileHandles)
+  const contentCacheRef = useRef(new Map<string, string>())
   sourceRef.current = source
+  notesRef.current = notes
+  fileHandlesRef.current = fileHandles
+
+  const clearContentCache = useCallback(() => {
+    contentCacheRef.current.clear()
+  }, [])
 
   const refreshRecentFolders = useCallback(async () => {
     if (!isDirectoryPickerSupported()) return
@@ -83,6 +95,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       const scanned = await scanDirectoryHandle(dirHandle)
       for (const url of blobCache.values()) URL.revokeObjectURL(url)
       blobCache.clear()
+      clearContentCache()
       setNotes(scanned.notes)
       setFileHandles(scanned.fileHandles)
       setFolderLabel(scanned.folderName)
@@ -93,7 +106,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setActiveFolderId(id)
       await refreshRecentFolders()
     },
-    [blobCache, refreshRecentFolders],
+    [blobCache, clearContentCache, refreshRecentFolders],
   )
 
   const resyncOpenFolder = useCallback(async () => {
@@ -106,6 +119,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       const scanned = await scanDirectoryHandle(handle)
       for (const url of blobCache.values()) URL.revokeObjectURL(url)
       blobCache.clear()
+      clearContentCache()
       setNotes(scanned.notes)
       setFileHandles(scanned.fileHandles)
       setFolderLabel(scanned.folderName)
@@ -113,7 +127,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     } catch {
       // Ignore transient read errors while files are being saved.
     }
-  }, [blobCache])
+  }, [blobCache, clearContentCache])
 
   useEffect(() => {
     let cancelled = false
@@ -162,6 +176,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const onBundledNotesUpdate = async () => {
       if (sourceRef.current !== 'bundled') return
       const mod = await import('virtual:notes')
+      clearContentCache()
       setNotes(mod.default.map((n) => ({ ...n })))
       setFolderLabel(mod.notesRoot)
     }
@@ -170,7 +185,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return () => {
       import.meta.hot?.off('knowledgehub:notes-update', onBundledNotesUpdate)
     }
-  }, [])
+  }, [clearContentCache])
 
   const openFolder = useCallback(async () => {
     if (!isDirectoryPickerSupported()) {
@@ -201,6 +216,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       if (activeFolderId === id) {
         for (const url of blobCache.values()) URL.revokeObjectURL(url)
         blobCache.clear()
+        clearContentCache()
         setNotes(cloneBundledNotes())
         setFileHandles(new Map())
         setFolderLabel(bundledRoot)
@@ -211,7 +227,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       }
       await refreshRecentFolders()
     },
-    [activeFolderId, blobCache, refreshRecentFolders],
+    [activeFolderId, blobCache, clearContentCache, refreshRecentFolders],
   )
 
   const clearRecentFolderHistory = useCallback(async () => {
@@ -219,6 +235,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (source === 'folder') {
       for (const url of blobCache.values()) URL.revokeObjectURL(url)
       blobCache.clear()
+      clearContentCache()
       setNotes(cloneBundledNotes())
       setFileHandles(new Map())
       setFolderLabel(bundledRoot)
@@ -228,11 +245,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
     setActiveFolderId(null)
     await refreshRecentFolders()
-  }, [blobCache, refreshRecentFolders, source])
+  }, [blobCache, clearContentCache, refreshRecentFolders, source])
 
   const resetToBundled = useCallback(async () => {
     for (const url of blobCache.values()) URL.revokeObjectURL(url)
     blobCache.clear()
+    clearContentCache()
     setNotes(cloneBundledNotes())
     setFileHandles(new Map())
     setFolderLabel(bundledRoot)
@@ -241,7 +259,25 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     dirHandleRef.current = null
     folderFingerprintRef.current = ''
     await clearDirectoryHandle()
-  }, [blobCache])
+  }, [blobCache, clearContentCache])
+
+  const loadNoteContent = useCallback(async (notePath: string): Promise<string | null> => {
+    const cached = contentCacheRef.current.get(notePath)
+    if (cached !== undefined) return cached
+
+    const note = notesRef.current.find((n) => n.path === notePath)
+    if (note?.content !== undefined) {
+      contentCacheRef.current.set(notePath, note.content)
+      return note.content
+    }
+
+    const handle = fileHandlesRef.current.get(notePath)
+    if (!handle) return null
+
+    const text = await readFileHandleText(handle)
+    contentCacheRef.current.set(notePath, text)
+    return text
+  }, [])
 
   const resolveAssetUrl = useCallback(
     async (fromNotePath: string, src: string) => {
@@ -301,10 +337,26 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       removeRecentFolderEntry,
       clearRecentFolderHistory,
       resetToBundled,
+      loadNoteContent,
       resolveAssetUrl,
       notesPaths,
     }),
-    [notes, folderLabel, source, ready, openFolder, openRecentFolder, removeRecentFolderEntry, clearRecentFolderHistory, resetToBundled, resolveAssetUrl, notesPaths, recentFolders, activeFolderId],
+    [
+      notes,
+      folderLabel,
+      source,
+      ready,
+      openFolder,
+      openRecentFolder,
+      removeRecentFolderEntry,
+      clearRecentFolderHistory,
+      resetToBundled,
+      loadNoteContent,
+      resolveAssetUrl,
+      notesPaths,
+      recentFolders,
+      activeFolderId,
+    ],
   )
 
   return <NotesContext.Provider value={value}>{children}</NotesContext.Provider>

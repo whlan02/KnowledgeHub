@@ -18,12 +18,14 @@ const HIDE_DELAY_MS = 180
 type PreviewModel =
   | { kind: 'content'; title: string; subtitle: string; markdown: string }
   | { kind: 'missing'; title: string; subtitle: string; message: string }
+  | { kind: 'loading'; title: string; subtitle: string }
 
 type LinkPreviewAnchorProps = {
   href: string
   previewHref?: string
   notePath: string
   notes: Note[]
+  loadNoteContent: (notePath: string) => Promise<string | null>
   className?: string
   children: ReactNode
   onNavigate?: (e: React.MouseEvent<HTMLAnchorElement>) => void
@@ -36,6 +38,7 @@ export function LinkPreviewAnchor({
   previewHref,
   notePath,
   notes,
+  loadNoteContent,
   className,
   children,
   onNavigate,
@@ -48,18 +51,28 @@ export function LinkPreviewAnchor({
   const cardRef = useRef<HTMLDivElement>(null)
   const showTimerRef = useRef<number | undefined>(undefined)
   const hideTimerRef = useRef<number | undefined>(undefined)
+  const previewGenRef = useRef(0)
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const [preview, setPreview] = useState<PreviewModel | null>(null)
 
-  const buildPreview = useCallback((): PreviewModel | null => {
+  const buildPreview = useCallback(async (): Promise<PreviewModel | null> => {
     const { pathPart, hash } = splitHrefHash(sourceHref)
 
     // Same-page heading: `#section`
     if (!pathPart && hash) {
       const current = notes.find((n) => n.path === notePath)
       if (!current) return null
-      const section = extractMarkdownSection(current.content, hash)
+      const body = await loadNoteContent(current.path)
+      if (body == null) {
+        return {
+          kind: 'missing',
+          title: `#${hash}`,
+          subtitle: current.path,
+          message: t('linkPreviewMissing'),
+        }
+      }
+      const section = extractMarkdownSection(body, hash)
       if (!section) {
         return {
           kind: 'missing',
@@ -90,8 +103,18 @@ export function LinkPreviewAnchor({
       }
     }
 
+    const body = await loadNoteContent(note.path)
+    if (body == null) {
+      return {
+        kind: 'missing',
+        title: note.title,
+        subtitle: note.path,
+        message: t('linkPreviewMissing'),
+      }
+    }
+
     if (hash) {
-      const section = extractMarkdownSection(note.content, hash)
+      const section = extractMarkdownSection(body, hash)
       if (!section) {
         return {
           kind: 'missing',
@@ -112,9 +135,9 @@ export function LinkPreviewAnchor({
       kind: 'content',
       title: note.title,
       subtitle: note.path,
-      markdown: note.content,
+      markdown: body,
     }
-  }, [sourceHref, notePath, notes, missingInternal, t])
+  }, [sourceHref, notePath, notes, loadNoteContent, missingInternal, t])
 
   const reposition = useCallback((clientX: number, clientY: number) => {
     const width = cardRef.current?.offsetWidth ?? PREVIEW_CARD_WIDTH
@@ -129,19 +152,39 @@ export function LinkPreviewAnchor({
   const scheduleHide = () => {
     cancelHide()
     hideTimerRef.current = window.setTimeout(() => {
+      previewGenRef.current += 1
       setOpen(false)
       setPreview(null)
     }, HIDE_DELAY_MS)
   }
 
   const openPreview = useCallback(() => {
-    const model = buildPreview()
-    if (!model) return
-    setPreview(model)
+    const gen = ++previewGenRef.current
+    const target = notes.find((n) => {
+      const { pathPart } = splitHrefHash(sourceHref)
+      if (!pathPart && sourceHref.startsWith('#')) return n.path === notePath
+      const resolved = resolveNoteLink(notePath, pathPart || sourceHref)
+      return resolved ? n.path === resolved : false
+    })
+
+    setPreview({
+      kind: 'loading',
+      title: target?.title ?? t('noteLoading'),
+      subtitle: target?.path ?? '',
+    })
     setOpen(true)
-    // Freeze around the pointer at open time; don't chase the cursor while reading.
     reposition(pointerRef.current.x, pointerRef.current.y)
-  }, [buildPreview, reposition])
+
+    void buildPreview().then((model) => {
+      if (gen !== previewGenRef.current) return
+      if (!model) {
+        setOpen(false)
+        setPreview(null)
+        return
+      }
+      setPreview(model)
+    })
+  }, [buildPreview, notes, notePath, sourceHref, reposition, t])
 
   const scheduleOpen = () => {
     cancelHide()
@@ -213,6 +256,8 @@ export function LinkPreviewAnchor({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
               {preview.kind === 'missing' ? (
                 <p className="py-2 text-xs text-amber-600 dark:text-amber-400">{preview.message}</p>
+              ) : preview.kind === 'loading' ? (
+                <p className="py-2 text-xs text-muted-foreground">{t('noteLoading')}</p>
               ) : (
                 <MarkdownPreviewBody content={preview.markdown} />
               )}

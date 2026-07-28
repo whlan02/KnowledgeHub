@@ -10,14 +10,37 @@ import { TableOfContents } from '@/components/table-of-contents'
 
 export function NotePage() {
   const { t } = useTranslation()
-  const { notes, source, activeFolderId } = useNotes()
+  const { notes, source, activeFolderId, loadNoteContent } = useNotes()
   const params = useParams()
   const splat = params['*'] ?? ''
   const notePath = decodeNotePath(splat)
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
+  const [content, setContent] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
 
   const note = notes.find((n) => n.path === notePath)
-  const toc = useMemo(() => (note ? extractToc(note.content) : []), [note])
+  const toc = useMemo(() => (content ? extractToc(content) : []), [content])
+
+  useEffect(() => {
+    let cancelled = false
+    setContent(null)
+
+    if (!note) {
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    void loadNoteContent(notePath).then((text) => {
+      if (cancelled) return
+      setContent(text)
+      setLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [note, notePath, loadNoteContent])
 
   useEffect(() => {
     scrollEl?.scrollTo({ top: 0 })
@@ -27,7 +50,7 @@ export function NotePage() {
         document.getElementById(id)?.scrollIntoView()
       })
     }
-  }, [notePath, scrollEl])
+  }, [notePath, scrollEl, content])
 
   useEffect(() => {
     if (!note) return
@@ -51,10 +74,31 @@ export function NotePage() {
     )
   }
 
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-10 text-sm text-muted-foreground">
+        {t('noteLoading')}
+      </div>
+    )
+  }
+
+  if (content === null) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">
+        <div className="text-center">
+          <p className="mb-3">{t('noteNotFound')}</p>
+          <Link to="/" className="text-sm text-foreground underline-offset-4 hover:underline">
+            README
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="relative flex min-h-0 flex-1">
       <div ref={setScrollEl} className="min-w-0 flex-1 overflow-y-auto">
-        <MarkdownView content={note.content} notePath={note.path} />
+        <MarkdownView content={content} notePath={note.path} />
       </div>
       <TableOfContents items={toc} scrollRoot={scrollEl} />
     </div>

@@ -44,7 +44,7 @@ export function MarkdownView({
   notePath: string
 }) {
   const navigate = useNavigate()
-  const { notes, notesPaths, resolveAssetUrl } = useNotes()
+  const { notes, notesPaths, resolveAssetUrl, loadNoteContent } = useNotes()
 
   const components = useMemo<Components>(
     () => ({
@@ -55,6 +55,7 @@ export function MarkdownView({
               href={href}
               notePath={notePath}
               notes={notes}
+              loadNoteContent={loadNoteContent}
               className={className}
               {...props}
             >
@@ -73,6 +74,7 @@ export function MarkdownView({
               previewHref={href}
               notePath={notePath}
               notes={notes}
+              loadNoteContent={loadNoteContent}
               className={className}
               missingInternal={!exists}
               title={exists ? undefined : `Missing: ${resolved}`}
@@ -112,7 +114,7 @@ export function MarkdownView({
         )
       },
     }),
-    [navigate, notePath, notes, notesPaths, resolveAssetUrl],
+    [navigate, notePath, notes, notesPaths, loadNoteContent, resolveAssetUrl],
   )
 
   return (

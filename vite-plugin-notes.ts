@@ -37,7 +37,7 @@ function walkMarkdown(dir: string, root: string, out: string[] = []) {
 
 function titleFromContent(content: string, fallback: string) {
   const match = content.match(/^#\s+(.+)$/m)
-  return match ? match[1].trim() : fallback
+  return match?.[1]?.trim() || fallback
 }
 
 function collectNotes(notesRoot: string) {

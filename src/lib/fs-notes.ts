@@ -3,7 +3,8 @@ export type Note = {
   path: string
   title: string
   folder: string
-  content: string
+  /** Bundled notes ship with content; folder notes load on demand. */
+  content?: string
 }
 
 const IGNORE_DIRS = new Set([
@@ -13,7 +14,7 @@ const IGNORE_DIRS = new Set([
   '.cursor',
 ])
 
-function titleFromContent(content: string, fallback: string) {
+export function titleFromContent(content: string, fallback: string) {
   const match = content.match(/^#\s+(.+)$/m)
   return match ? match[1].trim() : fallback
 }
@@ -21,12 +22,12 @@ function titleFromContent(content: string, fallback: string) {
 export type ScannedFolder = {
   folderName: string
   notes: Note[]
-  /** Relative path to file handle, used for images and other assets. */
+  /** Relative path to file handle, used for notes, images and other assets. */
   fileHandles: Map<string, FileSystemFileHandle>
   dirHandle: FileSystemDirectoryHandle
 }
 
-/** Cheap change detection for polling (path + size + mtime, all files). */
+/** Cheap change detection for polling (md: path+size+mtime; other files: path only). */
 export async function fingerprintDirectoryHandle(
   dirHandle: FileSystemDirectoryHandle,
 ): Promise<string> {
@@ -41,8 +42,12 @@ export async function fingerprintDirectoryHandle(
       }
 
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name
-      const file = await entry.getFile()
-      parts.push(`${rel}\t${file.lastModified}\t${file.size}`)
+      if (entry.name.toLowerCase().endsWith('.md')) {
+        const file = await entry.getFile()
+        parts.push(`${rel}\t${file.lastModified}\t${file.size}`)
+      } else {
+        parts.push(rel)
+      }
     }
   }
 
@@ -51,6 +56,7 @@ export async function fingerprintDirectoryHandle(
   return parts.join('\n')
 }
 
+/** Index notes for the sidebar only — does not read markdown bodies. */
 export async function scanDirectoryHandle(
   dirHandle: FileSystemDirectoryHandle,
 ): Promise<ScannedFolder> {
@@ -70,16 +76,12 @@ export async function scanDirectoryHandle(
 
       if (!entry.name.toLowerCase().endsWith('.md')) continue
 
-      const file = await entry.getFile()
-      const content = await file.text()
       const base = entry.name.replace(/\.md$/i, '')
-      const folder = prefix
       notes.push({
         id: rel,
         path: rel,
-        title: titleFromContent(content, base),
-        folder,
-        content,
+        title: base,
+        folder: prefix,
       })
     }
   }
@@ -93,6 +95,11 @@ export async function scanDirectoryHandle(
     fileHandles,
     dirHandle,
   }
+}
+
+export async function readFileHandleText(handle: FileSystemFileHandle): Promise<string> {
+  const file = await handle.getFile()
+  return file.text()
 }
 
 export function isDirectoryPickerSupported() {

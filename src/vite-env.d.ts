@@ -14,7 +14,7 @@ declare module 'virtual:notes' {
     path: string
     title: string
     folder: string
-    content: string
+    content?: string
   }
 
   export const notesRoot: string
