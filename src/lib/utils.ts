@@ -38,9 +38,11 @@ export function resolveNoteLink(fromNotePath: string, href: string) {
     decoded = clean
   }
 
-  if (!decoded.endsWith('.md') && !decoded.endsWith('/')) {
-    // Allow folder links such as ./guides/
-    if (!decoded.includes('/')) return null
+  // Only Markdown files and directory links (which resolve to README.md)
+  // participate in note navigation and hover previews.
+  const lastSegment = decoded.split('/').pop() ?? ''
+  if (!decoded.toLowerCase().endsWith('.md') && !decoded.endsWith('/') && lastSegment.includes('.')) {
+    return null
   }
 
   const fromDir = fromNotePath.includes('/')

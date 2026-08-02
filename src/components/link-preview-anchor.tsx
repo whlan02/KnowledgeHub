@@ -145,20 +145,37 @@ export function LinkPreviewAnchor({
     setPosition(computePreviewPosition(clientX, clientY, width, height))
   }, [])
 
-  const cancelHide = () => {
-    window.clearTimeout(hideTimerRef.current)
+  const clearShow = () => {
+    window.clearTimeout(showTimerRef.current)
+    showTimerRef.current = undefined
   }
 
+  const cancelHide = () => {
+    window.clearTimeout(hideTimerRef.current)
+    hideTimerRef.current = undefined
+  }
+
+  const closePreview = useCallback(() => {
+    clearShow()
+    cancelHide()
+    setOpen(false)
+    setPreview(null)
+  }, [])
+
   const scheduleHide = () => {
+    // If the pointer leaves before the show delay finishes, do not open later.
+    clearShow()
     cancelHide()
     hideTimerRef.current = window.setTimeout(() => {
       previewGenRef.current += 1
       setOpen(false)
       setPreview(null)
+      hideTimerRef.current = undefined
     }, HIDE_DELAY_MS)
   }
 
   const openPreview = useCallback(() => {
+    if (document.visibilityState !== 'visible') return
     const gen = ++previewGenRef.current
     const target = notes.find((n) => {
       const { pathPart } = splitHrefHash(sourceHref)
@@ -187,8 +204,9 @@ export function LinkPreviewAnchor({
   }, [buildPreview, notes, notePath, sourceHref, reposition, t])
 
   const scheduleOpen = () => {
+    if (document.visibilityState !== 'visible') return
     cancelHide()
-    window.clearTimeout(showTimerRef.current)
+    clearShow()
     showTimerRef.current = window.setTimeout(openPreview, SHOW_DELAY_MS)
   }
 
@@ -209,11 +227,24 @@ export function LinkPreviewAnchor({
   }, [open, reposition])
 
   useEffect(() => {
-    return () => {
-      window.clearTimeout(showTimerRef.current)
-      window.clearTimeout(hideTimerRef.current)
+    const onWindowBlur = () => closePreview()
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') closePreview()
     }
-  }, [])
+
+    window.addEventListener('blur', onWindowBlur)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      window.removeEventListener('blur', onWindowBlur)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [closePreview])
+
+  useEffect(() => {
+    return () => {
+      closePreview()
+    }
+  }, [closePreview])
 
   return (
     <>
