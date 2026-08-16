@@ -55,7 +55,7 @@ function TreeItem({
   depth: number
 }) {
   const isDir = !node.note
-  const [open, setOpen] = useState(depth < 2)
+  const [open, setOpen] = useState(false)
 
   if (isDir) {
     return (

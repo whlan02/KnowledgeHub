@@ -6,7 +6,7 @@ export type TocItem = {
   level: number
 }
 
-const HEADING_RE = /^(#{1,4})\s+(.+)$/gm
+const HEADING_RE = /^(#{2,4})\s+(.+)$/gm
 
 export function extractToc(markdown: string): TocItem[] {
   const items: TocItem[] = []
