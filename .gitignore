@@ -12,10 +12,9 @@ dist
 dist-ssr
 .notes-root
 
-# Editor
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
+# Editor / local tooling
+.cursor/
+.vscode/
 .idea
 .DS_Store
 *.suo
