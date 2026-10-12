@@ -211,11 +211,28 @@ export async function clearRecentFolders() {
   })
 }
 
-export async function ensureReadPermission(handle: FileSystemDirectoryHandle) {
-  const opts = { mode: 'read' as const }
+export type DirectoryPermissionMode = 'read' | 'readwrite'
+
+export async function queryDirectoryPermission(
+  handle: FileSystemDirectoryHandle,
+  mode: DirectoryPermissionMode,
+) {
+  const opts = { mode }
   // @ts-expect-error FileSystemHandle permission querying
-  if ((await handle.queryPermission?.(opts)) === 'granted') return true
+  return (await handle.queryPermission?.(opts)) === 'granted'
+}
+
+export async function ensureDirectoryPermission(
+  handle: FileSystemDirectoryHandle,
+  mode: DirectoryPermissionMode,
+) {
+  if (await queryDirectoryPermission(handle, mode)) return true
+  const opts = { mode }
   // @ts-expect-error FileSystemHandle permission requesting
   if ((await handle.requestPermission?.(opts)) === 'granted') return true
   return false
+}
+
+export async function ensureReadPermission(handle: FileSystemDirectoryHandle) {
+  return ensureDirectoryPermission(handle, 'read')
 }

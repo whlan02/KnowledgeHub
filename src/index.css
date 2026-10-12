@@ -251,6 +251,48 @@
   color: var(--muted-foreground);
 }
 
+.note-editor {
+  min-height: 70vh;
+  outline: none;
+}
+
+.note-editor:focus {
+  outline: none;
+}
+
+.note-editor p.is-editor-empty:first-child::before {
+  color: var(--muted-foreground);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.markdown-body ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2rem;
+}
+
+.markdown-body li[data-type='taskItem'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.markdown-body li[data-type='taskItem'] > label {
+  margin-top: 0.35rem;
+  user-select: none;
+}
+
+.markdown-body li[data-type='taskItem'] > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.markdown-body li[data-type='taskItem'] > div > p {
+  margin: 0.15rem 0;
+}
+
 /* Compact Markdown inside link hover preview windows */
 .markdown-preview-body {
   font-size: 13px;

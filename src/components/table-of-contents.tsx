@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, Pin } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { TocItem } from '@/lib/toc'
+import { scrollHeadingIntoView, type TocItem } from '@/lib/toc'
 import { ScrollArea } from '@/components/ui/scroll-area'
 
 type TocNode = TocItem & { children: TocNode[] }
@@ -45,11 +45,6 @@ function ancestorIdsOf(nodes: TocNode[], targetId: string): Set<string> {
 
   walk(nodes, [])
   return result
-}
-
-function scrollToHeading(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  history.replaceState(null, '', `#${id}`)
 }
 
 const TOC_PIN_KEY = 'kh-toc-pinned'
@@ -158,7 +153,7 @@ export function TableOfContents({
   const jumpToHeading = (id: string) => {
     setActiveId(id)
     if (scrollRoot) beginSpySuspend(scrollRoot)
-    scrollToHeading(id)
+    scrollHeadingIntoView(id, scrollRoot)
   }
 
   const toggleExpanded = (id: string, currentlyExpanded: boolean) => {

@@ -102,6 +102,15 @@ export async function readFileHandleText(handle: FileSystemFileHandle): Promise<
   return file.text()
 }
 
+export async function writeFileHandleText(handle: FileSystemFileHandle, text: string): Promise<void> {
+  const writable = await handle.createWritable()
+  try {
+    await writable.write(text)
+  } finally {
+    await writable.close()
+  }
+}
+
 export function isDirectoryPickerSupported() {
   return typeof window !== 'undefined' && 'showDirectoryPicker' in window
 }

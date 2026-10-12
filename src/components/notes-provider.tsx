@@ -15,14 +15,18 @@ import {
   isDirectoryPickerSupported,
   readFileHandleText,
   scanDirectoryHandle,
+  titleFromContent,
+  writeFileHandleText,
 } from '@/lib/fs-notes'
 import {
   clearDirectoryHandle,
   clearRecentFolders,
+  ensureDirectoryPermission,
   ensureReadPermission,
   getRecentFolderHandle,
   listRecentFolders,
   loadDirectoryHandle,
+  queryDirectoryPermission,
   removeRecentFolder,
   saveDirectoryHandle,
   type RecentFolderEntry,
@@ -44,6 +48,18 @@ type NotesContextValue = {
   resetToBundled: () => Promise<void>
   /** Load markdown body for a note path (cached after first read). */
   loadNoteContent: (notePath: string) => Promise<string | null>
+  /** True when this note is a file in the opened folder (sample notes are not). */
+  noteCanSave: (notePath: string) => boolean
+  /** Current folder already has readwrite permission. */
+  folderWritable: boolean
+  /** Ask for readwrite on the open folder. Call from a click or focus. */
+  requestFolderWriteAccess: () => Promise<boolean>
+  /** Write markdown back to disk and refresh the change-detection baseline. */
+  saveNoteContent: (notePath: string, text: string) => Promise<void>
+  /** Skip folder polling until released. Use while a note has unsaved edits. */
+  holdFolderSync: () => () => void
+  /** Bumps when an opened folder is rescanned from disk. */
+  folderRevision: number
   resolveAssetUrl: (fromNotePath: string, src: string) => Promise<string | null>
   notesPaths: Set<string>
 }
@@ -65,8 +81,11 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [blobCache] = useState(() => new Map<string, string>())
   const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([])
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
+  const [folderWritable, setFolderWritable] = useState(false)
+  const [folderRevision, setFolderRevision] = useState(0)
   const [ready, setReady] = useState(false)
   const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
+  const syncHoldRef = useRef(0)
   const folderFingerprintRef = useRef('')
   const sourceRef = useRef(source)
   const notesRef = useRef(notes)
@@ -102,6 +121,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setSource('folder')
       dirHandleRef.current = scanned.dirHandle
       folderFingerprintRef.current = await fingerprintDirectoryHandle(scanned.dirHandle)
+      setFolderRevision((revision) => revision + 1)
       const id = await saveDirectoryHandle(dirHandle)
       setActiveFolderId(id)
       await refreshRecentFolders()
@@ -110,6 +130,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   )
 
   const resyncOpenFolder = useCallback(async () => {
+    if (syncHoldRef.current > 0) return
     const handle = dirHandleRef.current
     if (!handle || sourceRef.current !== 'folder') return
     try {
@@ -124,6 +145,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFileHandles(scanned.fileHandles)
       setFolderLabel(scanned.folderName)
       dirHandleRef.current = scanned.dirHandle
+      setFolderRevision((revision) => revision + 1)
     } catch {
       // Ignore transient read errors while files are being saved.
     }
@@ -137,8 +159,14 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await refreshRecentFolders()
         const handle = await loadDirectoryHandle()
         if (!handle || cancelled) return
-        const ok = await ensureReadPermission(handle)
-        if (!ok || cancelled) return
+        const writeOk = await queryDirectoryPermission(handle, 'readwrite')
+        if (cancelled) return
+        if (!writeOk) {
+          const ok = await ensureReadPermission(handle)
+          if (!ok || cancelled) return
+        }
+        if (cancelled) return
+        setFolderWritable(writeOk)
         await applyScanned(handle)
       } catch {
         // Ignore failures when restoring a previously granted folder handle.
@@ -179,6 +207,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearContentCache()
       setNotes(mod.default.map((n) => ({ ...n })))
       setFolderLabel(mod.notesRoot)
+      setFolderRevision((revision) => revision + 1)
     }
 
     import.meta.hot.on('knowledgehub:notes-update', onBundledNotesUpdate)
@@ -191,7 +220,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     if (!isDirectoryPickerSupported()) {
       throw new Error('Directory picker is not supported in this browser')
     }
-    const handle = await window.showDirectoryPicker({ mode: 'read' })
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
+    setFolderWritable(true)
     await applyScanned(handle)
   }, [applyScanned])
 
@@ -203,8 +233,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         await refreshRecentFolders()
         throw new Error('RECENT_FOLDER_MISSING')
       }
-      const ok = await ensureReadPermission(handle)
-      if (!ok) throw new Error('RECENT_FOLDER_DENIED')
+      const writeOk = await ensureDirectoryPermission(handle, 'readwrite')
+      if (!writeOk) {
+        const readOk = await ensureReadPermission(handle)
+        if (!readOk) throw new Error('RECENT_FOLDER_DENIED')
+      }
+      setFolderWritable(writeOk)
       await applyScanned(handle)
     },
     [applyScanned, refreshRecentFolders],
@@ -222,6 +256,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
         setFolderLabel(bundledRoot)
         setSource('bundled')
         setActiveFolderId(null)
+        setFolderWritable(false)
         dirHandleRef.current = null
         folderFingerprintRef.current = ''
       }
@@ -240,6 +275,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       setFileHandles(new Map())
       setFolderLabel(bundledRoot)
       setSource('bundled')
+      setFolderWritable(false)
       dirHandleRef.current = null
       folderFingerprintRef.current = ''
     }
@@ -256,6 +292,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     setFolderLabel(bundledRoot)
     setSource('bundled')
     setActiveFolderId(null)
+    setFolderWritable(false)
     dirHandleRef.current = null
     folderFingerprintRef.current = ''
     await clearDirectoryHandle()
@@ -277,6 +314,50 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     const text = await readFileHandleText(handle)
     contentCacheRef.current.set(notePath, text)
     return text
+  }, [])
+
+  const noteCanSave = useCallback((notePath: string) => {
+    return sourceRef.current === 'folder' && fileHandlesRef.current.has(notePath)
+  }, [])
+
+  const requestFolderWriteAccess = useCallback(async () => {
+    const dir = dirHandleRef.current
+    if (!dir || sourceRef.current !== 'folder') return false
+    const ok = await ensureDirectoryPermission(dir, 'readwrite')
+    setFolderWritable(ok)
+    return ok
+  }, [])
+
+  const holdFolderSync = useCallback(() => {
+    syncHoldRef.current += 1
+    let released = false
+    return () => {
+      if (released) return
+      released = true
+      syncHoldRef.current = Math.max(0, syncHoldRef.current - 1)
+    }
+  }, [])
+
+  const saveNoteContent = useCallback(async (notePath: string, text: string) => {
+    syncHoldRef.current += 1
+    try {
+      const handle = fileHandlesRef.current.get(notePath)
+      const dir = dirHandleRef.current
+      if (!handle || !dir || sourceRef.current !== 'folder') {
+        throw new Error('NOTE_READONLY')
+      }
+      const permitted = await queryDirectoryPermission(dir, 'readwrite')
+      if (!permitted) throw new Error('WRITE_DENIED')
+
+      await writeFileHandleText(handle, text)
+      contentCacheRef.current.set(notePath, text)
+      const base = notePath.split('/').pop()?.replace(/\.md$/i, '') ?? notePath
+      const title = titleFromContent(text, base)
+      setNotes((prev) => prev.map((n) => (n.path === notePath ? { ...n, title } : n)))
+      folderFingerprintRef.current = await fingerprintDirectoryHandle(dir)
+    } finally {
+      syncHoldRef.current -= 1
+    }
   }, [])
 
   const resolveAssetUrl = useCallback(
@@ -338,6 +419,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearRecentFolderHistory,
       resetToBundled,
       loadNoteContent,
+      noteCanSave,
+      folderWritable,
+      requestFolderWriteAccess,
+      saveNoteContent,
+      holdFolderSync,
+      folderRevision,
       resolveAssetUrl,
       notesPaths,
     }),
@@ -352,6 +439,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       clearRecentFolderHistory,
       resetToBundled,
       loadNoteContent,
+      noteCanSave,
+      folderWritable,
+      requestFolderWriteAccess,
+      saveNoteContent,
+      holdFolderSync,
+      folderRevision,
       resolveAssetUrl,
       notesPaths,
       recentFolders,
