@@ -24,7 +24,7 @@
 - [ ] Colors: the picker has no "remove all colors" entry and does not show which color the selection already has
 - [ ] Toggle: open / closed state is not saved (a toggle is closed when the note opens, `<details open>` is ignored); there are no toggle headings
 - [ ] Toggle / callout: what is inside them cannot be moved or selected as separate blocks; callout icons are fixed per type (no custom emoji)
-- [ ] Renaming or moving a note does not rewrite links to it in other notes; those links break (needs a workspace-wide link rewrite)
+- [x] Renaming or moving a note or folder rewrites links to it (and relative links inside moved notes) automatically, no prompt (`src/lib/link-rewrite.ts`)
 - [ ] File tree: no multi-select, no keyboard rename (F2), no undo besides restoring from the system trash; expanded folders are forgotten when the workspace is switched
 - [ ] Images: no resize or caption, and images that are no longer used stay in the `assets` folder
 - [ ] Next up (autonomous plan): code block language picker, table row/column actions, equations, bookmarks, page appearance, release build + desktop shortcut

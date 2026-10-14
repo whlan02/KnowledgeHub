@@ -34,7 +34,8 @@ import {
   touchRecentFolder,
   type RecentFolderEntry,
 } from '@/lib/recent-folders'
-import { isInside, joinPath, nameOf, parentOf, uniqueName } from '@/lib/path-ops'
+import { rewriteLinks } from '@/lib/link-rewrite'
+import { isInside, joinPath, nameOf, parentOf, remapPath, uniqueName } from '@/lib/path-ops'
 import { resolveAssetPath } from '@/lib/utils'
 
 type ChangeListener = (paths: string[]) => void
@@ -309,16 +310,33 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     [namesIn, refresh],
   )
 
+  /** Re-point links in every note so they still reach what was renamed or moved. */
+  const rewriteLinksAfterMove = useCallback(async (oldPaths: string[], from: string, to: string) => {
+    for (const oldPath of oldPaths) {
+      const newPath = remapPath(oldPath, from, to)
+      try {
+        const text = await readNote(newPath)
+        const next = rewriteLinks(text, oldPath, newPath, from, to)
+        if (next !== text) await writeNote(newPath, next)
+        contentCacheRef.current.delete(newPath)
+      } catch (err) {
+        console.error(err)
+      }
+    }
+  }, [])
+
   const moveTo = useCallback(
     async (from: string, to: string) => {
       if (from === to) return to
       await prepareToChangeFiles()
+      const before = notesRef.current.map((n) => n.path)
       await renameEntryFile(from, to)
       forgetCachedPaths(from)
+      await rewriteLinksAfterMove(before, from, to)
       await refresh()
       return to
     },
-    [forgetCachedPaths, prepareToChangeFiles, refresh],
+    [forgetCachedPaths, prepareToChangeFiles, refresh, rewriteLinksAfterMove],
   )
 
   const renameEntry = useCallback(
