@@ -84,6 +84,14 @@ function EditorLink({ mark }: MarkViewProps) {
   const resolved = isExternal ? null : resolveNoteLink(notePath, href)
   const exists = resolved ? notesPaths.has(resolved) : false
 
+  const linkClass = resolved
+    ? exists
+      ? 'note-link'
+      : 'note-link note-link-missing'
+    : href.startsWith('#')
+      ? 'anchor-link'
+      : undefined
+
   const follow = (e: React.MouseEvent<HTMLAnchorElement>) => {
     e.preventDefault()
     if (isExternal) {
@@ -100,7 +108,7 @@ function EditorLink({ mark }: MarkViewProps) {
 
   if (isExternal) {
     return (
-      <a href={href} onClick={follow}>
+      <a href={href} onClick={follow} title={href}>
         <MarkViewContent />
       </a>
     )
@@ -113,6 +121,7 @@ function EditorLink({ mark }: MarkViewProps) {
       notePath={notePath}
       notes={notes}
       loadNoteContent={loadNoteContent}
+      className={linkClass}
       missingInternal={Boolean(resolved) && !exists}
       title={resolved && !exists ? `Missing: ${resolved}` : undefined}
       onNavigate={follow}

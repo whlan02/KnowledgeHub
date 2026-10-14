@@ -170,14 +170,87 @@
   margin: 0.2rem 0;
 }
 
+/* External links: same colour as the text, a soft underline that firms up on hover. */
 .markdown-body a {
-  color: oklch(0.45 0.12 250);
+  color: inherit;
   text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, currentColor 35%, transparent);
   text-underline-offset: 3px;
+  border-radius: 3px;
+  transition:
+    background-color 0.12s,
+    text-decoration-color 0.12s;
 }
 
-.dark .markdown-body a {
-  color: oklch(0.78 0.1 230);
+.markdown-body a:hover {
+  background: var(--accent);
+  text-decoration-color: currentColor;
+}
+
+/* Links to other notes look like a page mention: a small chip with a page icon. */
+.markdown-body a.note-link {
+  display: inline-block;
+  padding: 0 0.4em 0 1.45em;
+  position: relative;
+  background: color-mix(in oklab, var(--muted-foreground) 12%, transparent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.markdown-body a.note-link::before {
+  content: "";
+  position: absolute;
+  left: 0.4em;
+  top: 50%;
+  width: 0.9em;
+  height: 0.9em;
+  transform: translateY(-50%);
+  background: currentColor;
+  opacity: 0.6;
+  -webkit-mask: var(--kh-page-icon) center / contain no-repeat;
+  mask: var(--kh-page-icon) center / contain no-repeat;
+}
+
+.markdown-body a.note-link:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 22%, transparent);
+}
+
+.markdown-body a.note-link-missing {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in oklab, currentColor 50%, transparent);
+}
+
+/* Links to a heading in the same note. */
+.markdown-body a.anchor-link {
+  text-decoration: none;
+  color: var(--muted-foreground);
+}
+
+.markdown-body a.anchor-link::before {
+  content: "#";
+  margin-right: 0.15em;
+  opacity: 0.6;
+}
+
+:root {
+  --kh-page-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 2v6h6'/%3E%3Cpath d='M16 13H8M16 17H8M10 9H8'/%3E%3C/svg%3E");
+}
+
+/* Anything you can click shows a pointer. */
+button:not(:disabled),
+[role="button"],
+[role="menuitem"],
+[role="option"],
+summary,
+select,
+label[for],
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
 }
 
 .markdown-body strong {
