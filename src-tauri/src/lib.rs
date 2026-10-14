@@ -2,6 +2,7 @@ mod assets;
 mod files;
 mod paths;
 mod scan;
+mod search;
 mod watcher;
 
 use notify::RecommendedWatcher;
@@ -128,6 +129,12 @@ fn rename_entry(state: State<Workspace>, from: String, to: String) -> Result<(),
     files::rename_entry(&resolve(&state, &from)?, &resolve(&state, &to)?, &to)
 }
 
+/// Search the text of every note for `query` (case-insensitive).
+#[tauri::command]
+fn search_notes(state: State<Workspace>, query: String) -> Result<Vec<search::SearchHit>, String> {
+    Ok(search::search(&current_root(&state)?, &query, 50))
+}
+
 /// Move a note or folder to the system trash.
 #[tauri::command]
 fn delete_entry(state: State<Workspace>, path: String) -> Result<(), String> {
@@ -164,7 +171,8 @@ pub fn run() {
             create_note,
             create_folder,
             rename_entry,
-            delete_entry
+            delete_entry,
+            search_notes
         ])
         .run(tauri::generate_context!())
         .expect("error while running KnowledgeHub");

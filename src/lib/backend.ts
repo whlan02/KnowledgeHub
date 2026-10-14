@@ -46,6 +46,13 @@ export function writeNote(path: string, text: string) {
   return invoke<void>('write_note', { path, text })
 }
 
+export type SearchHit = { path: string; title: string; line: number; snippet: string }
+
+/** Case-insensitive search of the text of every note. */
+export function searchNotes(query: string) {
+  return invoke<SearchHit[]>('search_notes', { query })
+}
+
 /** Errors the backend reports for file operations; anything else is a system message. */
 export type FileErrorCode = 'ALREADY_EXISTS' | 'INVALID_NAME' | 'NOT_FOUND' | 'INVALID_TARGET'
 

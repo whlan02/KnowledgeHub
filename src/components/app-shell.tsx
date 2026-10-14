@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
+import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Search, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
 import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
+import { QuickOpen } from '@/components/quick-open'
 import { useFileActions } from '@/components/use-file-actions'
 import { WindowControls } from '@/components/window-controls'
 import { Button } from '@/components/ui/button'
@@ -40,12 +41,24 @@ export function AppShell() {
   const fileActions = useFileActions()
   const [renameRequest, setRenameRequest] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
   const setLang = (lng: 'zh' | 'en') => {
     localStorage.setItem('kh-lang', lng)
     void i18n.changeLanguage(lng)
   }
+
+  // Ctrl+P opens the quick switcher and note search.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'p') return
+      event.preventDefault()
+      setSearchOpen((open) => !open)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   // Ctrl+N starts a note next to the one that is open.
   const { newNote, openPath } = fileActions
@@ -279,6 +292,16 @@ export function AppShell() {
               variant="ghost"
               size="icon"
               className="size-7"
+              aria-label={t('searchTitle')}
+              title={`${t('searchTitle')} (Ctrl+P)`}
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
               aria-label={t('fileNewNote')}
               title={`${t('fileNewNote')} (Ctrl+N)`}
               onClick={() => void fileActions.newNote('')}
@@ -305,6 +328,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <QuickOpen open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )
 }
