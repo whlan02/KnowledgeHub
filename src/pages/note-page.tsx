@@ -8,6 +8,9 @@ import { saveLastLocation } from '@/lib/last-location'
 import { NoteEditor } from '@/components/note-editor'
 import { TableOfContents } from '@/components/table-of-contents'
 
+/** A note's body together with where it was read from (the same path can exist in two folders). */
+type LoadedNote = { folderId: string | null; path: string; text: string | null }
+
 export function NotePage() {
   const { t } = useTranslation()
   const { notes, activeFolderId, loadNoteContent } = useNotes()
@@ -15,15 +18,18 @@ export function NotePage() {
   const splat = params['*'] ?? ''
   const notePath = decodeNotePath(splat)
   const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null)
-  const [content, setContent] = useState<string | null>(null)
+  const [loaded, setLoaded] = useState<LoadedNote | null>(null)
   const [liveContent, setLiveContent] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
   const onDraft = useCallback((text: string) => {
     setLiveContent(text)
   }, [])
 
   const note = notes.find((n) => n.path === notePath)
   const hasNote = Boolean(note)
+  // The body only counts for the note it was read from; right after a route change it is stale.
+  const isLoaded = loaded?.path === notePath && loaded.folderId === activeFolderId
+  const content = isLoaded ? loaded.text : null
+  const loading = hasNote && !isLoaded
   const toc = useMemo(() => {
     const sourceText = liveContent ?? content
     return sourceText ? extractToc(sourceText) : []
@@ -32,20 +38,13 @@ export function NotePage() {
   // Load the body once per note. Later edits on disk are picked up by the editor itself.
   useEffect(() => {
     let cancelled = false
-    setContent(null)
     setLiveContent(null)
+    if (!hasNote) return
 
-    if (!hasNote) {
-      setLoading(false)
-      return
-    }
-
-    setLoading(true)
     void loadNoteContent(notePath).then((text) => {
       if (cancelled) return
-      setContent(text)
+      setLoaded({ folderId: activeFolderId, path: notePath, text })
       setLiveContent(text)
-      setLoading(false)
     })
 
     return () => {
@@ -73,7 +72,7 @@ export function NotePage() {
     })
   }, [note, activeFolderId])
 
-  if (!note || (!loading && content === null)) {
+  if (!note || (isLoaded && content === null)) {
     return (
       <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">
         <div className="text-center">
@@ -97,7 +96,7 @@ export function NotePage() {
   return (
     <div className="relative flex min-h-0 flex-1">
       <div ref={setScrollEl} data-note-scroll className="min-w-0 flex-1 overflow-y-auto">
-        <NoteEditor notePath={note.path} initialContent={content} onDraft={onDraft} />
+        <NoteEditor key={note.path} notePath={note.path} initialContent={content} onDraft={onDraft} />
       </div>
       <TableOfContents items={toc} scrollRoot={scrollEl} />
     </div>

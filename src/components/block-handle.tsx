@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Editor } from '@tiptap/core'
+import { defaultRules, type DragHandleRule } from '@tiptap/extension-drag-handle'
 import { DragHandle } from '@tiptap/extension-drag-handle-react'
 import { GripVertical, Plus } from 'lucide-react'
 import { restoreCursor } from '@/lib/block-actions'
@@ -13,6 +14,17 @@ const handleButtonClass =
   'flex size-6 items-center justify-center rounded-sm text-muted-foreground/60 hover:bg-muted hover:text-foreground'
 
 const HANDLE_GAP_PX = 4
+
+/** Quotes, callouts and toggles are one block: what sits inside them is passed over. */
+const keepContainersWhole: DragHandleRule = {
+  id: 'keepContainersWhole',
+  evaluate: ({ node, parent }) => {
+    const inContainer = parent && ['blockquote', 'callout', 'details'].includes(parent.type.name)
+    return inContainer || ['detailsSummary', 'detailsContent'].includes(node.type.name) ? 1000 : 0
+  },
+}
+
+const NESTED_BLOCKS = { rules: [...defaultRules, keepContainersWhole] }
 
 /**
  * Where the handle should sit for a block. A list item's marker is drawn in the list's left
@@ -113,7 +125,7 @@ export function BlockHandle({ editor, notePath }: { editor: Editor; notePath: st
     <>
       <DragHandle
         editor={editor}
-        nested
+        nested={NESTED_BLOCKS}
         onNodeChange={onNodeChange}
         getReferencedVirtualElement={getHandleAnchor}
       >

@@ -7,6 +7,12 @@ import {
   selectionInside,
   type BlockRef,
 } from '@/lib/block-tree'
+import {
+  isContainerBlock,
+  turnIntoToggle,
+  unwrapContainer,
+  wrapInCallout,
+} from '@/lib/block-containers'
 
 export type BlockTypeId =
   | 'paragraph'
@@ -16,7 +22,9 @@ export type BlockTypeId =
   | 'todo'
   | 'bullet'
   | 'ordered'
+  | 'toggle'
   | 'quote'
+  | 'callout'
   | 'code'
   | 'divider'
 
@@ -37,18 +45,20 @@ export const BLOCK_TYPES: BlockType[] = [
   { id: 'todo', labelKey: 'blockTodo', shortcutDigit: 4, keywords: ['todo','task','checkbox','check','待办','任务'] },
   { id: 'bullet', labelKey: 'blockBullet', shortcutDigit: 5, keywords: ['bullet','ul','list','unordered','无序','列表'] },
   { id: 'ordered', labelKey: 'blockOrdered', shortcutDigit: 6, keywords: ['numbered','ol','list','ordered','有序','列表'] },
+  { id: 'toggle', labelKey: 'blockToggle', shortcutDigit: 7, keywords: ['toggle','details','collapse','fold','折叠','展开'] },
   { id: 'quote', labelKey: 'blockQuote', keywords: ['quote','blockquote','引用'] },
+  { id: 'callout', labelKey: 'blockCallout', keywords: ['callout','note','alert','admonition','提示','注意'] },
   { id: 'code', labelKey: 'blockCode', shortcutDigit: 8, keywords: ['code','codeblock','代码'] },
   { id: 'divider', labelKey: 'blockDivider', keywords: ['divider','hr','line','rule','分隔','分割线'] },
 ]
 
 const LIST_ITEM_NODES = ['listItem', 'taskItem']
 const LIST_NODES = ['bulletList', 'orderedList', 'taskList']
-const TEXT_LIKE_NODES = [...LIST_ITEM_NODES, 'blockquote']
+const TEXT_LIKE_NODES = LIST_ITEM_NODES
 
 /** True for blocks whose type can be switched (not tables, images or dividers). */
 export function canTurnInto(node: ProseNode) {
-  return node.isTextblock || TEXT_LIKE_NODES.includes(node.type.name)
+  return node.isTextblock || isContainerBlock(node) || TEXT_LIKE_NODES.includes(node.type.name)
 }
 
 function selectInside(editor: Editor, pos: number) {
@@ -75,13 +85,25 @@ function alreadyIs(editor: Editor, type: BlockTypeId) {
   }
 }
 
+/** The block is already a quote, callout or toggle and `type` asks for the same. */
+function alreadyContainer(node: ProseNode, type: BlockTypeId) {
+  const containers: Partial<Record<BlockTypeId, string>> = {
+    quote: 'blockquote',
+    callout: 'callout',
+    toggle: 'details',
+  }
+  return containers[type] === node.type.name
+}
+
 /** Convert the block at `pos` to another type, the way Notion's "Turn into" does. */
 export function turnInto(editor: Editor, pos: number, type: BlockTypeId) {
-  selectInside(editor, pos)
+  const node = editor.state.doc.nodeAt(pos)
+  if (!node || alreadyContainer(node, type)) return
+
+  selectInside(editor, unwrapContainer(editor, pos))
   if (alreadyIs(editor, type)) return
 
   liftOutOfLists(editor)
-  if (editor.isActive('blockquote')) editor.commands.lift('blockquote')
 
   const commands = editor.commands
   switch (type) {
@@ -99,6 +121,12 @@ export function turnInto(editor: Editor, pos: number, type: BlockTypeId) {
     case 'quote':
       commands.setParagraph()
       commands.toggleBlockquote()
+      break
+    case 'callout':
+      wrapInCallout(editor)
+      break
+    case 'toggle':
+      turnIntoToggle(editor)
       break
     case 'bullet':
       commands.setParagraph()

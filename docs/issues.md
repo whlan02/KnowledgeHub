@@ -23,3 +23,6 @@
 - [ ] Colors: a block color colors the block's text runs, so text typed later in the block is not colored; inline code cannot be colored (TipTap's code mark excludes other marks)
 - [ ] Colors: hover preview cards drop the color tags instead of rendering them; GitHub shows the `{red}` tags literally (the chosen trade-off)
 - [ ] Colors: the picker has no "remove all colors" entry and does not show which color the selection already has
+- [ ] Toggle: open / closed state is not saved (a toggle is closed when the note opens, `<details open>` is ignored); there are no toggle headings
+- [ ] Toggle / callout: what is inside them cannot be moved or selected as separate blocks; callout icons are fixed per type (no custom emoji)
+- [ ] Switching notes used to be able to write the previous note's text into the new file (stale body with the new path); fixed in `NotePage`, but there is no regression test for it

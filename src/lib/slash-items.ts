@@ -1,7 +1,9 @@
 import type { Editor } from '@tiptap/core'
 import i18n from '@/i18n'
 import { BLOCK_TYPES, currentBlockPos, turnInto, type BlockType, type BlockTypeId } from '@/lib/block-actions'
+import { setCalloutTypeAtCaret } from '@/lib/block-containers'
 import { targetBlocks } from '@/lib/block-selection'
+import { CALLOUT_TYPES, type CalloutType } from '@/lib/callout'
 import { colorBlocks } from '@/lib/color-actions'
 import { COLOR_NAMES, type ColorChoice, type ColorTarget } from '@/lib/colors'
 
@@ -44,6 +46,22 @@ function blockItem(type: BlockType): SlashItem {
   }
 }
 
+/** `/tip`, `/warning`…: a callout of that type (the plain Callout entry is a note). */
+function calloutItem(type: Exclude<CalloutType, 'note'>): SlashItem {
+  const label = (lng: string) => `${translate('blockCallout', lng)} · ${translate(`callout_${type}`, lng)}`
+  return {
+    id: `callout:${type}`,
+    group: 'basic',
+    label: label(i18n.language),
+    keywords: [type, `callout ${type}`, label('zh'), label('en')],
+    icon: { kind: 'block', id: 'callout' },
+    apply(editor) {
+      turnInto(editor, currentBlockPos(editor), 'callout')
+      setCalloutTypeAtCaret(editor, type)
+    },
+  }
+}
+
 function colorItem(target: ColorTarget, color: Exclude<ColorChoice, 'default'>): SlashItem {
   const labelKey = target === 'text' ? 'slashColorText' : 'slashColorBackground'
   const label = (lng: string) => translate(labelKey, lng, { color: translate(`color_${color}`, lng) })
@@ -66,6 +84,7 @@ function colorItem(target: ColorTarget, color: Exclude<ColorChoice, 'default'>):
 function allItems(): SlashItem[] {
   return [
     ...BLOCK_TYPES.map(blockItem),
+    ...CALLOUT_TYPES.filter((type) => type !== 'note').map(calloutItem),
     ...(['text', 'background'] as const).flatMap((target) =>
       COLOR_NAMES.map((color) => colorItem(target, color)),
     ),

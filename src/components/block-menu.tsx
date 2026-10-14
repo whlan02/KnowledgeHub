@@ -6,6 +6,7 @@ import {
   ClipboardPaste,
   Copy,
   CopyPlus,
+  Info,
   Link2,
   Palette,
   Repeat2,
@@ -23,6 +24,8 @@ import {
   type BlockTypeId,
 } from '@/lib/block-actions'
 import type { BlockRef } from '@/lib/block-tree'
+import { setCalloutType } from '@/lib/block-containers'
+import { CALLOUT_ICONS, CALLOUT_TYPES } from '@/lib/callout'
 import { colorBlocks } from '@/lib/color-actions'
 import { readClipboardText } from '@/lib/backend'
 import { BLOCK_ICONS } from '@/components/block-icons'
@@ -129,7 +132,7 @@ export function BlockMenu({
   onClose: (restoreCursor: boolean) => void
 }) {
   const { t } = useTranslation()
-  const [submenu, setSubmenu] = useState<'turnInto' | 'color' | null>(null)
+  const [submenu, setSubmenu] = useState<'turnInto' | 'color' | 'calloutType' | null>(null)
   const last = menu.blocks.at(-1)
   if (!last) return null
 
@@ -187,6 +190,27 @@ export function BlockMenu({
           </div>
         )}
       </div>
+      {menu.blocks.length === 1 && menu.blocks[0].node.type.name === 'callout' && (
+        <div className="relative">
+          <MenuItem
+            icon={Info}
+            label={t('calloutChangeType')}
+            onSelect={() => setSubmenu((open) => (open === 'calloutType' ? null : 'calloutType'))}
+            trailing={<ChevronRight className="size-4 opacity-50" />}
+          />
+          {submenu === 'calloutType' && (
+            <div className="absolute left-full top-0 ml-1 min-w-[10rem] rounded-md border bg-popover p-1 shadow-md">
+              {CALLOUT_TYPES.map((type) => (
+                <MenuItem
+                  key={type}
+                  label={`${CALLOUT_ICONS[type]}  ${t(`callout_${type}`)}`}
+                  onSelect={() => run(() => setCalloutType(editor, menu.blocks[0].pos, type))}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       <MenuItem
         icon={CopyPlus}
         label={t('blockDuplicate')}

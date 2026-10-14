@@ -458,3 +458,118 @@
   background-color: var(--kh-bg-red);
   border-radius: 3px;
 }
+
+/* Callout (stored as a GitHub alert) */
+.note-editor .callout {
+  position: relative;
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  border-radius: 6px;
+}
+
+.note-editor .callout::before {
+  position: absolute;
+  top: 0.8rem;
+  left: 1rem;
+  line-height: 1.6;
+}
+
+.note-editor .callout > :first-child {
+  margin-top: 0;
+}
+
+.note-editor .callout > :last-child {
+  margin-bottom: 0;
+}
+
+.note-editor .callout[data-callout="note"] {
+  background: var(--kh-bg-blue);
+}
+
+.note-editor .callout[data-callout="note"]::before {
+  content: "ℹ️";
+}
+
+.note-editor .callout[data-callout="tip"] {
+  background: var(--kh-bg-green);
+}
+
+.note-editor .callout[data-callout="tip"]::before {
+  content: "💡";
+}
+
+.note-editor .callout[data-callout="important"] {
+  background: var(--kh-bg-purple);
+}
+
+.note-editor .callout[data-callout="important"]::before {
+  content: "❗";
+}
+
+.note-editor .callout[data-callout="warning"] {
+  background: var(--kh-bg-yellow);
+}
+
+.note-editor .callout[data-callout="warning"]::before {
+  content: "⚠️";
+}
+
+.note-editor .callout[data-callout="caution"] {
+  background: var(--kh-bg-red);
+}
+
+.note-editor .callout[data-callout="caution"]::before {
+  content: "🚫";
+}
+
+/* Toggle (stored as <details>) */
+.note-editor [data-type="details"] {
+  display: flex;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.note-editor [data-type="details"] > button {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.75rem;
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.note-editor [data-type="details"] > button::before {
+  content: "";
+  border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent currentColor;
+  transition: transform 0.15s;
+}
+
+.note-editor [data-type="details"].is-open > button::before {
+  transform: rotate(90deg);
+}
+
+.note-editor [data-type="details"] > div {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The browser draws its own triangle on <summary>; the toggle button replaces it. */
+.note-editor [data-type="details"] summary {
+  display: block;
+  font-weight: 500;
+  list-style: none;
+}
+
+.note-editor [data-type="details"] summary::marker {
+  content: "";
+}
+
+.note-editor [data-type="detailsContent"] > :first-child {
+  margin-top: 0.25rem;
+}
