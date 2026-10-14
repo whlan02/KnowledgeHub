@@ -292,6 +292,39 @@ button:disabled {
   padding: 0;
 }
 
+.markdown-body .code-block {
+  position: relative;
+  margin: 1rem 0;
+}
+
+.markdown-body .code-block pre {
+  margin: 0;
+}
+
+.markdown-body .code-language {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  z-index: 1;
+  border: 0;
+  border-radius: 0.3rem;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  padding: 0.1rem 0.3rem;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.markdown-body .code-block:hover .code-language,
+.markdown-body .code-language:focus {
+  opacity: 1;
+}
+
+.markdown-body .code-language:hover {
+  background: var(--accent);
+}
+
 .markdown-body table {
   width: 100%;
   border-collapse: collapse;

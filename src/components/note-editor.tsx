@@ -16,6 +16,7 @@ import { ImageUpload, imageFileName, markdownImageSrc } from '@/lib/image-upload
 import { toNoteMarkdown } from '@/lib/note-markdown'
 import {
   BlockShortcuts,
+  EditorCodeBlock,
   EditorLinkMark,
   EditorNoteContext,
   HeadingIds,
@@ -121,7 +122,7 @@ export function NoteEditor({
   const editor = useEditor(
     {
       extensions: [
-        ...documentExtensions({ link: EditorLinkMark, image: WorkspaceImage }),
+        ...documentExtensions({ link: EditorLinkMark, image: WorkspaceImage, codeBlock: EditorCodeBlock }),
         Placeholder.configure({
           placeholder: t('editorPlaceholder'),
         }),

@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import { Markdown } from '@tiptap/markdown'
+import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import { Table } from '@tiptap/extension-table'
@@ -20,14 +21,17 @@ import { MarkdownUnderline } from '@/lib/underline'
 export function documentExtensions({
   link = Link,
   image = Image,
-}: { link?: typeof Link; image?: typeof Image } = {}) {
+  codeBlock = CodeBlock,
+}: { link?: typeof Link; image?: typeof Image; codeBlock?: typeof CodeBlock } = {}) {
   return [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
       link: false,
+      codeBlock: false,
       underline: false,
       dropcursor: { color: '#2383e2', width: 2 },
     }),
+    codeBlock,
     link.configure({ openOnClick: false, autolink: true }),
     TaskList,
     TaskItem.configure({ nested: true }),

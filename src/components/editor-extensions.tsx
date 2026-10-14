@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Extension } from '@tiptap/core'
 import {
   MarkViewContent,
+  NodeViewContent,
   NodeViewWrapper,
   ReactMarkViewRenderer,
   ReactNodeViewRenderer,
   type MarkViewProps,
   type ReactNodeViewProps,
 } from '@tiptap/react'
+import CodeBlock from '@tiptap/extension-code-block'
 import Image from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import { Plugin } from '@tiptap/pm/state'
@@ -24,6 +26,7 @@ import {
 } from '@/lib/block-actions'
 import { selectedBlocks, targetBlocks } from '@/lib/block-selection'
 import { colorBlocks, colorSelection } from '@/lib/color-actions'
+import { languageOptions } from '@/lib/code-languages'
 import { loadLastColor } from '@/lib/colors'
 import { OPEN_BLOCK_MENU_EVENT, OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { useNotes } from '@/components/notes-provider'
@@ -137,6 +140,37 @@ export const EditorLinkMark = Link.extend({
   },
 })
 
+
+/** Code block with a language picker; the language is the Markdown fence's info string. */
+function CodeBlockView({ node, updateAttributes, editor }: ReactNodeViewProps) {
+  const language = String(node.attrs.language ?? '')
+  return (
+    <NodeViewWrapper className="code-block">
+      <select
+        contentEditable={false}
+        className="code-language"
+        value={language}
+        disabled={!editor.isEditable}
+        onChange={(event) => updateAttributes({ language: event.target.value || null })}
+      >
+        {languageOptions(language).map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      <pre>
+        <NodeViewContent as={'code' as 'div'} />
+      </pre>
+    </NodeViewWrapper>
+  )
+}
+
+export const EditorCodeBlock = CodeBlock.extend({
+  addNodeView() {
+    return ReactNodeViewRenderer(CodeBlockView)
+  },
+})
 
 /** Images whose `src` is relative to the note are loaded from the workspace. */
 export const WorkspaceImage = Image.extend({
