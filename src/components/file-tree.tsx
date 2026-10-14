@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react'
-import type { Note } from 'virtual:notes'
+import type { Note } from '@/lib/fs-notes'
 import { cn, encodeNotePath } from '@/lib/utils'
 import { ScrollArea } from '@/components/ui/scroll-area'
 

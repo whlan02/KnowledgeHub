@@ -1,0 +1,17 @@
+# Open issues
+
+- [ ] Create / rename / delete / move notes from the file tree — step 3 of the Notion plan
+- [ ] `/` block menu and selection toolbar — rest of `docs/phase-1.md`
+- [ ] Links in the editor follow on plain click, which makes it hard to edit link text; add a link editor in the selection toolbar
+- [ ] Windows desktop shortcut still launches `tauri dev`; point it at the built exe once release builds are set up
+- [ ] No automated tests yet; start with Markdown round trip, `resolveNoteLink`, and Rust `safe_join`
+- [ ] Remove unused dependencies (`rehype-raw`, `remark-breaks`, `@radix-ui/react-tooltip`)
+- [ ] `react-markdown` is still used for hover preview cards only; render previews with a read-only TipTap instead
+- [ ] Block handle: dragging from the `+` button also drags the block (both buttons sit inside the draggable handle)
+- [ ] Block handle: inserting a divider below a list item splits the list in two
+- [ ] Block menu: no Color / Move to / word count yet (colors are step 4 of `docs/notion-page-features.md`)
+- [ ] Block menu: "Copy link to block" only works on headings, since only headings have stable ids
+- [ ] Block actions (`src/lib/block-actions.ts`) have no automated tests and the block-handle change has not been through `/code-review`
+- [ ] Slash menu: only block types so far; `/duplicate`, `/delete` and colors (`/red`) come with the color step
+- [ ] Selection toolbar: no color dropdown yet, no comment / @-mention
+- [ ] Slash menu and selection toolbar have no automated tests; the slash popup is placed by hand instead of floating-ui

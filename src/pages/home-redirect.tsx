@@ -5,7 +5,7 @@ import { resolveHomeNotePath } from '@/lib/last-location'
 import { useNotes } from '@/components/notes-provider'
 
 export function HomeRedirect() {
-  const { notes, source, activeFolderId, ready } = useNotes()
+  const { notes, activeFolderId, ready } = useNotes()
 
   useEffect(() => {
     document.title = 'KnowledgeHub'
@@ -19,7 +19,7 @@ export function HomeRedirect() {
     )
   }
 
-  const targetPath = resolveHomeNotePath(notes, source, activeFolderId)
+  const targetPath = resolveHomeNotePath(notes, activeFolderId)
 
   if (!targetPath) {
     return <div className="flex flex-1 items-center justify-center text-muted-foreground">No notes</div>

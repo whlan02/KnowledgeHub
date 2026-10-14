@@ -8,168 +8,116 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import bundledNotes, { notesRoot as bundledRoot } from 'virtual:notes'
 import type { Note } from '@/lib/fs-notes'
 import {
-  fingerprintDirectoryHandle,
-  isDirectoryPickerSupported,
-  readFileHandleText,
-  scanDirectoryHandle,
-  titleFromContent,
-  writeFileHandleText,
-} from '@/lib/fs-notes'
+  defaultWorkspace,
+  onWorkspaceChanged,
+  openWorkspace,
+  pickFolder,
+  readNote,
+  scanWorkspace,
+  workspaceFileUrl,
+  writeNote,
+  type WorkspaceInfo,
+} from '@/lib/backend'
 import {
-  clearDirectoryHandle,
   clearRecentFolders,
-  ensureDirectoryPermission,
-  ensureReadPermission,
-  getRecentFolderHandle,
-  listRecentFolders,
-  loadDirectoryHandle,
-  queryDirectoryPermission,
+  loadActiveWorkspace,
+  loadRecentFolders,
   removeRecentFolder,
-  saveDirectoryHandle,
+  saveActiveWorkspace,
+  touchRecentFolder,
   type RecentFolderEntry,
-} from '@/lib/idb-handles'
+} from '@/lib/recent-folders'
+import { resolveAssetPath } from '@/lib/utils'
+
+type ChangeListener = (paths: string[]) => void
 
 type NotesContextValue = {
   notes: Note[]
   folderLabel: string
-  source: 'bundled' | 'folder'
-  /** False until the initial folder restore attempt finishes (avoids wrong home redirect). */
-  ready: boolean
-  pickerSupported: boolean
-  recentFolders: RecentFolderEntry[]
+  /** Absolute path of the open workspace; also used as its id. */
   activeFolderId: string | null
+  /** True while the open workspace is the built-in `Documents/KnowledgeHub` one. */
+  isDefaultWorkspace: boolean
+  /** False until the initial workspace is open (avoids wrong home redirect). */
+  ready: boolean
+  recentFolders: RecentFolderEntry[]
   openFolder: () => Promise<void>
   openRecentFolder: (id: string) => Promise<void>
   removeRecentFolderEntry: (id: string) => Promise<void>
   clearRecentFolderHistory: () => Promise<void>
-  resetToBundled: () => Promise<void>
-  /** Load markdown body for a note path (cached after first read). */
+  openDefaultWorkspace: () => Promise<void>
+  /** Markdown body of a note (cached after first read). */
   loadNoteContent: (notePath: string) => Promise<string | null>
-  /** True when this note is a file in the opened folder (sample notes are not). */
-  noteCanSave: (notePath: string) => boolean
-  /** Current folder already has readwrite permission. */
-  folderWritable: boolean
-  /** Ask for readwrite on the open folder. Call from a click or focus. */
-  requestFolderWriteAccess: () => Promise<boolean>
-  /** Write markdown back to disk and refresh the change-detection baseline. */
+  /** Write markdown back to disk. */
   saveNoteContent: (notePath: string, text: string) => Promise<void>
-  /** Skip folder polling until released. Use while a note has unsaved edits. */
-  holdFolderSync: () => () => void
-  /** Bumps when an opened folder is rescanned from disk. */
-  folderRevision: number
-  resolveAssetUrl: (fromNotePath: string, src: string) => Promise<string | null>
+  /** Read straight from disk, bypassing the cache. */
+  readNoteFromDisk: (notePath: string) => Promise<string | null>
+  /** Called with the changed note paths whenever files change under the workspace. */
+  subscribeChanges: (listener: ChangeListener) => () => void
+  resolveAssetUrl: (fromNotePath: string, src: string) => string
   notesPaths: Set<string>
 }
 
 const NotesContext = createContext<NotesContextValue | null>(null)
 
-/** How often to check an opened local folder for file changes. */
-const FOLDER_POLL_MS = 1500
+/** Wait this long after the last file event before rescanning, so a burst becomes one scan. */
+const CHANGE_DEBOUNCE_MS = 200
 
-function cloneBundledNotes(): Note[] {
-  return bundledNotes.map((n) => ({ ...n }))
+function sameNotes(a: Note[], b: Note[]) {
+  return (
+    a.length === b.length &&
+    a.every((n, i) => n.path === b[i].path && n.title === b[i].title)
+  )
 }
 
 export function NotesProvider({ children }: { children: ReactNode }) {
-  const [notes, setNotes] = useState<Note[]>(() => cloneBundledNotes())
-  const [folderLabel, setFolderLabel] = useState(bundledRoot)
-  const [source, setSource] = useState<'bundled' | 'folder'>('bundled')
-  const [fileHandles, setFileHandles] = useState<Map<string, FileSystemFileHandle>>(new Map())
-  const [blobCache] = useState(() => new Map<string, string>())
-  const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
+  const [folderLabel, setFolderLabel] = useState('')
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
-  const [folderWritable, setFolderWritable] = useState(false)
-  const [folderRevision, setFolderRevision] = useState(0)
+  const [defaultRoot, setDefaultRoot] = useState<string | null>(null)
+  const [recentFolders, setRecentFolders] = useState<RecentFolderEntry[]>(() => loadRecentFolders())
   const [ready, setReady] = useState(false)
-  const dirHandleRef = useRef<FileSystemDirectoryHandle | null>(null)
-  const syncHoldRef = useRef(0)
-  const folderFingerprintRef = useRef('')
-  const sourceRef = useRef(source)
-  const notesRef = useRef(notes)
-  const fileHandlesRef = useRef(fileHandles)
   const contentCacheRef = useRef(new Map<string, string>())
-  sourceRef.current = source
-  notesRef.current = notes
-  fileHandlesRef.current = fileHandles
+  const listenersRef = useRef(new Set<ChangeListener>())
 
-  const clearContentCache = useCallback(() => {
+  const applyWorkspace = useCallback((info: WorkspaceInfo) => {
     contentCacheRef.current.clear()
+    setNotes(info.notes)
+    setFolderLabel(info.name)
+    setActiveFolderId(info.root)
+    saveActiveWorkspace(info.root)
+    setRecentFolders(touchRecentFolder(info.root, info.name))
   }, [])
 
-  const refreshRecentFolders = useCallback(async () => {
-    if (!isDirectoryPickerSupported()) return
-    try {
-      const list = await listRecentFolders()
-      setRecentFolders(list)
-    } catch {
-      setRecentFolders([])
-    }
-  }, [])
+  const openDefaultWorkspace = useCallback(async () => {
+    const root = await defaultWorkspace()
+    setDefaultRoot(root)
+    applyWorkspace(await openWorkspace(root))
+  }, [applyWorkspace])
 
-  const applyScanned = useCallback(
-    async (dirHandle: FileSystemDirectoryHandle) => {
-      const scanned = await scanDirectoryHandle(dirHandle)
-      for (const url of blobCache.values()) URL.revokeObjectURL(url)
-      blobCache.clear()
-      clearContentCache()
-      setNotes(scanned.notes)
-      setFileHandles(scanned.fileHandles)
-      setFolderLabel(scanned.folderName)
-      setSource('folder')
-      dirHandleRef.current = scanned.dirHandle
-      folderFingerprintRef.current = await fingerprintDirectoryHandle(scanned.dirHandle)
-      setFolderRevision((revision) => revision + 1)
-      const id = await saveDirectoryHandle(dirHandle)
-      setActiveFolderId(id)
-      await refreshRecentFolders()
-    },
-    [blobCache, clearContentCache, refreshRecentFolders],
-  )
-
-  const resyncOpenFolder = useCallback(async () => {
-    if (syncHoldRef.current > 0) return
-    const handle = dirHandleRef.current
-    if (!handle || sourceRef.current !== 'folder') return
-    try {
-      const nextFp = await fingerprintDirectoryHandle(handle)
-      if (nextFp === folderFingerprintRef.current) return
-      folderFingerprintRef.current = nextFp
-      const scanned = await scanDirectoryHandle(handle)
-      for (const url of blobCache.values()) URL.revokeObjectURL(url)
-      blobCache.clear()
-      clearContentCache()
-      setNotes(scanned.notes)
-      setFileHandles(scanned.fileHandles)
-      setFolderLabel(scanned.folderName)
-      dirHandleRef.current = scanned.dirHandle
-      setFolderRevision((revision) => revision + 1)
-    } catch {
-      // Ignore transient read errors while files are being saved.
-    }
-  }, [blobCache, clearContentCache])
-
+  // Restore the last workspace, falling back to the default one.
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        if (!isDirectoryPickerSupported()) return
-        await refreshRecentFolders()
-        const handle = await loadDirectoryHandle()
-        if (!handle || cancelled) return
-        const writeOk = await queryDirectoryPermission(handle, 'readwrite')
+        const root = await defaultWorkspace()
         if (cancelled) return
-        if (!writeOk) {
-          const ok = await ensureReadPermission(handle)
-          if (!ok || cancelled) return
+        setDefaultRoot(root)
+        const saved = loadActiveWorkspace()
+        let info: WorkspaceInfo | null = null
+        if (saved) {
+          try {
+            info = await openWorkspace(saved)
+          } catch {
+            saveActiveWorkspace(null)
+          }
         }
-        if (cancelled) return
-        setFolderWritable(writeOk)
-        await applyScanned(handle)
-      } catch {
-        // Ignore failures when restoring a previously granted folder handle.
+        info ??= await openWorkspace(root)
+        if (!cancelled) applyWorkspace(info)
+      } catch (err) {
+        console.error(err)
       } finally {
         if (!cancelled) setReady(true)
       }
@@ -177,230 +125,107 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [applyScanned, refreshRecentFolders])
+  }, [applyWorkspace])
 
+  // Follow changes on disk: rescan the file list and tell open notes which paths changed.
   useEffect(() => {
-    if (source !== 'folder' || !dirHandleRef.current) return
+    let timer: number | undefined
+    let disposed = false
+    let unlisten: (() => void) | undefined
+    const pending = new Set<string>()
 
-    const tick = () => {
-      if (document.visibilityState === 'hidden') return
-      void resyncOpenFolder()
+    const flush = async () => {
+      timer = undefined
+      const paths = [...pending]
+      pending.clear()
+      for (const path of paths) contentCacheRef.current.delete(path)
+      try {
+        const next = await scanWorkspace()
+        if (disposed) return
+        setNotes((prev) => (sameNotes(prev, next) ? prev : next))
+      } catch {
+        // The workspace may be mid-switch; the next event will retry.
+      }
+      for (const listener of listenersRef.current) listener(paths)
     }
 
-    const id = window.setInterval(tick, FOLDER_POLL_MS)
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void resyncOpenFolder()
-    }
-    document.addEventListener('visibilitychange', onVisible)
+    void onWorkspaceChanged((paths) => {
+      for (const path of paths) pending.add(path)
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => void flush(), CHANGE_DEBOUNCE_MS)
+    }).then((fn) => {
+      if (disposed) fn()
+      else unlisten = fn
+    })
+
     return () => {
-      window.clearInterval(id)
-      document.removeEventListener('visibilitychange', onVisible)
+      disposed = true
+      window.clearTimeout(timer)
+      unlisten?.()
     }
-  }, [source, activeFolderId, resyncOpenFolder])
-
-  useEffect(() => {
-    if (!import.meta.hot) return
-
-    const onBundledNotesUpdate = async () => {
-      if (sourceRef.current !== 'bundled') return
-      const mod = await import('virtual:notes')
-      clearContentCache()
-      setNotes(mod.default.map((n) => ({ ...n })))
-      setFolderLabel(mod.notesRoot)
-      setFolderRevision((revision) => revision + 1)
-    }
-
-    import.meta.hot.on('knowledgehub:notes-update', onBundledNotesUpdate)
-    return () => {
-      import.meta.hot?.off('knowledgehub:notes-update', onBundledNotesUpdate)
-    }
-  }, [clearContentCache])
+  }, [])
 
   const openFolder = useCallback(async () => {
-    if (!isDirectoryPickerSupported()) {
-      throw new Error('Directory picker is not supported in this browser')
-    }
-    const handle = await window.showDirectoryPicker({ mode: 'readwrite' })
-    setFolderWritable(true)
-    await applyScanned(handle)
-  }, [applyScanned])
+    const picked = await pickFolder()
+    if (!picked) return
+    applyWorkspace(await openWorkspace(picked))
+  }, [applyWorkspace])
 
   const openRecentFolder = useCallback(
     async (id: string) => {
-      const handle = await getRecentFolderHandle(id)
-      if (!handle) {
-        await removeRecentFolder(id)
-        await refreshRecentFolders()
+      try {
+        applyWorkspace(await openWorkspace(id))
+      } catch {
+        setRecentFolders(removeRecentFolder(id))
         throw new Error('RECENT_FOLDER_MISSING')
       }
-      const writeOk = await ensureDirectoryPermission(handle, 'readwrite')
-      if (!writeOk) {
-        const readOk = await ensureReadPermission(handle)
-        if (!readOk) throw new Error('RECENT_FOLDER_DENIED')
-      }
-      setFolderWritable(writeOk)
-      await applyScanned(handle)
     },
-    [applyScanned, refreshRecentFolders],
+    [applyWorkspace],
   )
 
-  const removeRecentFolderEntry = useCallback(
-    async (id: string) => {
-      await removeRecentFolder(id)
-      if (activeFolderId === id) {
-        for (const url of blobCache.values()) URL.revokeObjectURL(url)
-        blobCache.clear()
-        clearContentCache()
-        setNotes(cloneBundledNotes())
-        setFileHandles(new Map())
-        setFolderLabel(bundledRoot)
-        setSource('bundled')
-        setActiveFolderId(null)
-        setFolderWritable(false)
-        dirHandleRef.current = null
-        folderFingerprintRef.current = ''
-      }
-      await refreshRecentFolders()
-    },
-    [activeFolderId, blobCache, clearContentCache, refreshRecentFolders],
-  )
+  const removeRecentFolderEntry = useCallback(async (id: string) => {
+    setRecentFolders(removeRecentFolder(id))
+  }, [])
 
   const clearRecentFolderHistory = useCallback(async () => {
-    await clearRecentFolders()
-    if (source === 'folder') {
-      for (const url of blobCache.values()) URL.revokeObjectURL(url)
-      blobCache.clear()
-      clearContentCache()
-      setNotes(cloneBundledNotes())
-      setFileHandles(new Map())
-      setFolderLabel(bundledRoot)
-      setSource('bundled')
-      setFolderWritable(false)
-      dirHandleRef.current = null
-      folderFingerprintRef.current = ''
-    }
-    setActiveFolderId(null)
-    await refreshRecentFolders()
-  }, [blobCache, clearContentCache, refreshRecentFolders, source])
-
-  const resetToBundled = useCallback(async () => {
-    for (const url of blobCache.values()) URL.revokeObjectURL(url)
-    blobCache.clear()
-    clearContentCache()
-    setNotes(cloneBundledNotes())
-    setFileHandles(new Map())
-    setFolderLabel(bundledRoot)
-    setSource('bundled')
-    setActiveFolderId(null)
-    setFolderWritable(false)
-    dirHandleRef.current = null
-    folderFingerprintRef.current = ''
-    await clearDirectoryHandle()
-  }, [blobCache, clearContentCache])
-
-  const loadNoteContent = useCallback(async (notePath: string): Promise<string | null> => {
-    const cached = contentCacheRef.current.get(notePath)
-    if (cached !== undefined) return cached
-
-    const note = notesRef.current.find((n) => n.path === notePath)
-    if (note?.content !== undefined) {
-      contentCacheRef.current.set(notePath, note.content)
-      return note.content
-    }
-
-    const handle = fileHandlesRef.current.get(notePath)
-    if (!handle) return null
-
-    const text = await readFileHandleText(handle)
-    contentCacheRef.current.set(notePath, text)
-    return text
+    setRecentFolders(clearRecentFolders())
   }, [])
 
-  const noteCanSave = useCallback((notePath: string) => {
-    return sourceRef.current === 'folder' && fileHandlesRef.current.has(notePath)
-  }, [])
-
-  const requestFolderWriteAccess = useCallback(async () => {
-    const dir = dirHandleRef.current
-    if (!dir || sourceRef.current !== 'folder') return false
-    const ok = await ensureDirectoryPermission(dir, 'readwrite')
-    setFolderWritable(ok)
-    return ok
-  }, [])
-
-  const holdFolderSync = useCallback(() => {
-    syncHoldRef.current += 1
-    let released = false
-    return () => {
-      if (released) return
-      released = true
-      syncHoldRef.current = Math.max(0, syncHoldRef.current - 1)
+  const readNoteFromDisk = useCallback(async (notePath: string): Promise<string | null> => {
+    try {
+      const text = await readNote(notePath)
+      contentCacheRef.current.set(notePath, text)
+      return text
+    } catch {
+      return null
     }
   }, [])
+
+  const loadNoteContent = useCallback(
+    async (notePath: string): Promise<string | null> => {
+      const cached = contentCacheRef.current.get(notePath)
+      if (cached !== undefined) return cached
+      return readNoteFromDisk(notePath)
+    },
+    [readNoteFromDisk],
+  )
 
   const saveNoteContent = useCallback(async (notePath: string, text: string) => {
-    syncHoldRef.current += 1
-    try {
-      const handle = fileHandlesRef.current.get(notePath)
-      const dir = dirHandleRef.current
-      if (!handle || !dir || sourceRef.current !== 'folder') {
-        throw new Error('NOTE_READONLY')
-      }
-      const permitted = await queryDirectoryPermission(dir, 'readwrite')
-      if (!permitted) throw new Error('WRITE_DENIED')
+    await writeNote(notePath, text)
+    contentCacheRef.current.set(notePath, text)
+  }, [])
 
-      await writeFileHandleText(handle, text)
-      contentCacheRef.current.set(notePath, text)
-      const base = notePath.split('/').pop()?.replace(/\.md$/i, '') ?? notePath
-      const title = titleFromContent(text, base)
-      setNotes((prev) => prev.map((n) => (n.path === notePath ? { ...n, title } : n)))
-      folderFingerprintRef.current = await fingerprintDirectoryHandle(dir)
-    } finally {
-      syncHoldRef.current -= 1
+  const subscribeChanges = useCallback((listener: ChangeListener) => {
+    listenersRef.current.add(listener)
+    return () => {
+      listenersRef.current.delete(listener)
     }
   }, [])
 
-  const resolveAssetUrl = useCallback(
-    async (fromNotePath: string, src: string) => {
-      if (!src || src.startsWith('http') || src.startsWith('data:') || src.startsWith('blob:')) {
-        return src
-      }
-
-      const fromDir = fromNotePath.includes('/')
-        ? fromNotePath.slice(0, fromNotePath.lastIndexOf('/'))
-        : ''
-      const joined = src.startsWith('/')
-        ? src.slice(1)
-        : [fromDir, src].filter(Boolean).join('/')
-      const parts: string[] = []
-      for (const part of joined.split('/')) {
-        if (!part || part === '.') continue
-        if (part === '..') {
-          parts.pop()
-          continue
-        }
-        try {
-          parts.push(decodeURIComponent(part))
-        } catch {
-          parts.push(part)
-        }
-      }
-      const rel = parts.join('/')
-
-      if (source === 'bundled') {
-        return `/@notes/${parts.map(encodeURIComponent).join('/')}`
-      }
-
-      if (blobCache.has(rel)) return blobCache.get(rel)!
-      const handle = fileHandles.get(rel)
-      if (!handle) return null
-      const file = await handle.getFile()
-      const url = URL.createObjectURL(file)
-      blobCache.set(rel, url)
-      return url
-    },
-    [blobCache, fileHandles, source],
-  )
+  const resolveAssetUrl = useCallback((fromNotePath: string, src: string) => {
+    const rel = resolveAssetPath(fromNotePath, src)
+    return rel ? workspaceFileUrl(rel) : src
+  }, [])
 
   const notesPaths = useMemo(() => new Set(notes.map((n) => n.path)), [notes])
 
@@ -408,47 +233,40 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     () => ({
       notes,
       folderLabel,
-      source,
-      ready,
-      pickerSupported: isDirectoryPickerSupported(),
-      recentFolders,
       activeFolderId,
+      isDefaultWorkspace: activeFolderId !== null && activeFolderId === defaultRoot,
+      ready,
+      recentFolders,
       openFolder,
       openRecentFolder,
       removeRecentFolderEntry,
       clearRecentFolderHistory,
-      resetToBundled,
+      openDefaultWorkspace,
       loadNoteContent,
-      noteCanSave,
-      folderWritable,
-      requestFolderWriteAccess,
       saveNoteContent,
-      holdFolderSync,
-      folderRevision,
+      readNoteFromDisk,
+      subscribeChanges,
       resolveAssetUrl,
       notesPaths,
     }),
     [
       notes,
       folderLabel,
-      source,
+      activeFolderId,
+      defaultRoot,
       ready,
+      recentFolders,
       openFolder,
       openRecentFolder,
       removeRecentFolderEntry,
       clearRecentFolderHistory,
-      resetToBundled,
+      openDefaultWorkspace,
       loadNoteContent,
-      noteCanSave,
-      folderWritable,
-      requestFolderWriteAccess,
       saveNoteContent,
-      holdFolderSync,
-      folderRevision,
+      readNoteFromDisk,
+      subscribeChanges,
       resolveAssetUrl,
       notesPaths,
-      recentFolders,
-      activeFolderId,
     ],
   )
 

@@ -79,3 +79,27 @@ export function resolveNoteLink(fromNotePath: string, href: string) {
 
   return target
 }
+
+/** Workspace-relative path of an image/file referenced from a note, or null for absolute URLs. */
+export function resolveAssetPath(fromNotePath: string, src: string) {
+  if (!src || /^(https?:|data:|blob:|mailto:)/i.test(src)) return null
+
+  const fromDir = fromNotePath.includes('/')
+    ? fromNotePath.slice(0, fromNotePath.lastIndexOf('/'))
+    : ''
+  const joined = src.startsWith('/') ? src.slice(1) : [fromDir, src].filter(Boolean).join('/')
+  const parts: string[] = []
+  for (const part of joined.split('/')) {
+    if (!part || part === '.') continue
+    if (part === '..') {
+      parts.pop()
+      continue
+    }
+    try {
+      parts.push(decodeURIComponent(part))
+    } catch {
+      parts.push(part)
+    }
+  }
+  return parts.join('/')
+}

@@ -6,6 +6,7 @@ import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
+import { WindowControls } from '@/components/window-controls'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -26,15 +27,14 @@ export function AppShell() {
   const {
     notes,
     folderLabel,
-    source,
-    pickerSupported,
+    isDefaultWorkspace,
     recentFolders,
     activeFolderId,
     openFolder,
     openRecentFolder,
     removeRecentFolderEntry,
     clearRecentFolderHistory,
-    resetToBundled,
+    openDefaultWorkspace,
   } = useNotes()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -50,10 +50,8 @@ export function AppShell() {
       await openFolder()
       navigate('/', { replace: true })
     } catch (err) {
-      if ((err as Error)?.name !== 'AbortError') {
-        console.error(err)
-        window.alert(t('folderPickFailed'))
-      }
+      console.error(err)
+      window.alert(t('folderPickFailed'))
     } finally {
       setBusy(false)
     }
@@ -68,9 +66,7 @@ export function AppShell() {
       const message = (err as Error)?.message
       if (message === 'RECENT_FOLDER_MISSING') {
         window.alert(t('recentFolderMissing'))
-      } else if (message === 'RECENT_FOLDER_DENIED') {
-        window.alert(t('recentFolderDenied'))
-      } else if ((err as Error)?.name !== 'AbortError') {
+      } else {
         console.error(err)
         window.alert(t('folderPickFailed'))
       }
@@ -102,7 +98,7 @@ export function AppShell() {
   const onReset = async () => {
     setBusy(true)
     try {
-      await resetToBundled()
+      await openDefaultWorkspace()
       navigate('/', { replace: true })
     } finally {
       setBusy(false)
@@ -111,7 +107,10 @@ export function AppShell() {
 
   return (
     <div className="flex h-svh flex-col bg-background text-foreground">
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+      <header
+        data-tauri-drag-region
+        className="flex h-12 shrink-0 select-none items-center gap-2 border-b px-3"
+      >
         <Button
           variant="ghost"
           size="icon"
@@ -120,60 +119,60 @@ export function AppShell() {
         >
           <PanelLeft />
         </Button>
-        <div className="flex items-center gap-2">
+        <div data-tauri-drag-region className="pointer-events-none flex items-center gap-2">
           <BookOpen className="size-4 text-muted-foreground" />
           <div className="leading-tight">
             <div className="text-sm font-semibold tracking-tight">{t('appName')}</div>
             <div className="text-[11px] text-muted-foreground">{t('appSubtitle')}</div>
           </div>
         </div>
-        <div className="ml-auto flex items-center gap-1">
-          {pickerSupported && (
-            <DropdownMenu>
-              <div className="flex items-center">
+        <div data-tauri-drag-region className="flex-1 self-stretch" />
+        <div className="flex items-center gap-1">
+          <DropdownMenu>
+            <div className="flex items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => void onOpenFolder()}
+                className="gap-1.5 rounded-r-none border-r-0 pr-2"
+              >
+                <FolderOpen className="size-3.5" />
+                {t('openFolder')}
+              </Button>
+              <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={busy}
-                  onClick={() => void onOpenFolder()}
-                  className="gap-1.5 rounded-r-none border-r-0 pr-2"
+                  className="rounded-l-none px-1.5"
+                  aria-label={t('recentFolders')}
                 >
-                  <FolderOpen className="size-3.5" />
-                  {t('openFolder')}
+                  <ChevronDown className="size-3.5" />
                 </Button>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={busy}
-                    className="rounded-l-none px-1.5"
-                    aria-label={t('recentFolders')}
-                  >
-                    <ChevronDown className="size-3.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-              </div>
-              <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuItem onClick={() => void onOpenFolder()}>
-                  <FolderOpen className="mr-2 size-4 opacity-70" />
-                  {t('openFolderChoose')}
-                </DropdownMenuItem>
-                {recentFolders.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel>{t('recentFolders')}</DropdownMenuLabel>
-                    {recentFolders.map((entry) => (
-                      <DropdownMenuItem
-                        key={entry.id}
-                        className="group flex items-center gap-2 pr-1"
-                        onClick={() => void onOpenRecent(entry.id)}
-                      >
-                        <FolderOpen
-                          className={cn(
-                            'size-4 shrink-0 opacity-70',
-                            entry.id === activeFolderId && source === 'folder' && 'text-primary',
-                          )}
-                        />
+              </DropdownMenuTrigger>
+            </div>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuItem onClick={() => void onOpenFolder()}>
+                <FolderOpen className="mr-2 size-4 opacity-70" />
+                {t('openFolderChoose')}
+              </DropdownMenuItem>
+              {recentFolders.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel>{t('recentFolders')}</DropdownMenuLabel>
+                  {recentFolders.map((entry) => (
+                    <DropdownMenuItem
+                      key={entry.id}
+                      className="group flex items-center gap-2 pr-1"
+                      onClick={() => void onOpenRecent(entry.id)}
+                    >
+                      <FolderOpen
+                        className={cn(
+                          'size-4 shrink-0 opacity-70',
+                          entry.id === activeFolderId && 'text-primary',
+                        )}
+                      />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium leading-tight">{entry.name}</div>
                           <div className="text-[11px] text-muted-foreground">
@@ -206,8 +205,7 @@ export function AppShell() {
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-          {source === 'folder' && (
+          {!isDefaultWorkspace && (
             <Button
               variant="ghost"
               size="icon"
@@ -245,6 +243,7 @@ export function AppShell() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        <WindowControls />
       </header>
 
       <div className="flex min-h-0 flex-1">

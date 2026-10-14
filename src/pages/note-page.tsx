@@ -5,13 +5,12 @@ import { decodeNotePath } from '@/lib/utils'
 import { extractToc, scrollHeadingIntoView } from '@/lib/toc'
 import { useNotes } from '@/components/notes-provider'
 import { saveLastLocation } from '@/lib/last-location'
-import { MarkdownView } from '@/components/markdown-view'
 import { NoteEditor } from '@/components/note-editor'
 import { TableOfContents } from '@/components/table-of-contents'
 
 export function NotePage() {
   const { t } = useTranslation()
-  const { notes, source, activeFolderId, folderRevision, loadNoteContent, noteCanSave } = useNotes()
+  const { notes, activeFolderId, loadNoteContent } = useNotes()
   const params = useParams()
   const splat = params['*'] ?? ''
   const notePath = decodeNotePath(splat)
@@ -25,12 +24,12 @@ export function NotePage() {
 
   const note = notes.find((n) => n.path === notePath)
   const hasNote = Boolean(note)
-  const canSave = note ? noteCanSave(note.path) : false
   const toc = useMemo(() => {
     const sourceText = liveContent ?? content
     return sourceText ? extractToc(sourceText) : []
   }, [content, liveContent])
 
+  // Load the body once per note. Later edits on disk are picked up by the editor itself.
   useEffect(() => {
     let cancelled = false
     setContent(null)
@@ -52,7 +51,7 @@ export function NotePage() {
     return () => {
       cancelled = true
     }
-  }, [hasNote, notePath, loadNoteContent, folderRevision])
+  }, [hasNote, notePath, activeFolderId, loadNoteContent])
 
   useEffect(() => {
     scrollEl?.scrollTo({ top: 0 })
@@ -69,13 +68,12 @@ export function NotePage() {
   useEffect(() => {
     if (!note) return
     saveLastLocation({
-      source,
       folderId: activeFolderId,
       notePath: note.path,
     })
-  }, [note, source, activeFolderId])
+  }, [note, activeFolderId])
 
-  if (!note) {
+  if (!note || (!loading && content === null)) {
     return (
       <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">
         <div className="text-center">
@@ -88,7 +86,7 @@ export function NotePage() {
     )
   }
 
-  if (loading) {
+  if (loading || content === null) {
     return (
       <div className="flex flex-1 items-center justify-center p-10 text-sm text-muted-foreground">
         {t('noteLoading')}
@@ -96,32 +94,10 @@ export function NotePage() {
     )
   }
 
-  if (content === null) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">
-        <div className="text-center">
-          <p className="mb-3">{t('noteNotFound')}</p>
-          <Link to="/" className="text-sm text-foreground underline-offset-4 hover:underline">
-            README
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex min-h-0 flex-1">
-      <div ref={setScrollEl} className="min-w-0 flex-1 overflow-y-auto">
-        {canSave ? (
-          <NoteEditor notePath={note.path} initialContent={content} onDraft={onDraft} />
-        ) : (
-          <>
-            {source === 'bundled' && (
-              <p className="mx-auto max-w-3xl px-6 pt-8 text-xs text-muted-foreground">{t('sampleReadOnly')}</p>
-            )}
-            <MarkdownView content={content} notePath={note.path} />
-          </>
-        )}
+      <div ref={setScrollEl} data-note-scroll className="min-w-0 flex-1 overflow-y-auto">
+        <NoteEditor notePath={note.path} initialContent={content} onDraft={onDraft} />
       </div>
       <TableOfContents items={toc} scrollRoot={scrollEl} />
     </div>

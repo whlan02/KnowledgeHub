@@ -3,22 +3,21 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { notesPlugin } from './vite-plugin-notes.ts'
-import { resolveNotesRoot } from './notes-root.ts'
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url))
-const notesRoot = resolveNotesRoot()
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), notesPlugin({ notesRoot })],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       '@': path.resolve(rootDir, 'src'),
     },
   },
+  // Keep Rust compiler output visible and make the Tauri dev URL stable.
+  clearScreen: false,
   server: {
-    fs: {
-      allow: [rootDir, notesRoot],
-    },
+    port: 5173,
+    strictPort: true,
+    watch: { ignored: ['**/src-tauri/**'] },
   },
 })

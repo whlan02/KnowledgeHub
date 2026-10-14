@@ -331,3 +331,15 @@
 .markdown-preview-body img {
   margin: 0.55rem 0;
 }
+
+/* Block that the block menu is acting on */
+.note-editor .block-menu-target {
+  background: color-mix(in oklab, #2383e2 14%, transparent);
+  border-radius: 4px;
+}
+
+/* Block being dragged by its handle */
+.note-editor .ProseMirror-selectednode {
+  background: color-mix(in oklab, #2383e2 14%, transparent);
+  border-radius: 4px;
+}

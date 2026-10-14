@@ -3,7 +3,6 @@ import type { Note } from '@/lib/fs-notes'
 const STORAGE_KEY = 'kh-last-location'
 
 export type LastLocation = {
-  source: 'bundled' | 'folder'
   folderId: string | null
   notePath: string
 }
@@ -22,7 +21,6 @@ export function loadLastLocation(): LastLocation | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as LastLocation
     if (!parsed || typeof parsed.notePath !== 'string') return null
-    if (parsed.source !== 'bundled' && parsed.source !== 'folder') return null
     if (parsed.folderId != null && typeof parsed.folderId !== 'string') return null
     return parsed
   } catch {
@@ -30,18 +28,9 @@ export function loadLastLocation(): LastLocation | null {
   }
 }
 
-export function resolveHomeNotePath(
-  notes: Note[],
-  source: 'bundled' | 'folder',
-  activeFolderId: string | null,
-): string | null {
+export function resolveHomeNotePath(notes: Note[], activeFolderId: string | null): string | null {
   const last = loadLastLocation()
-  if (
-    last &&
-    last.source === source &&
-    last.folderId === activeFolderId &&
-    notes.some((n) => n.path === last.notePath)
-  ) {
+  if (last && last.folderId === activeFolderId && notes.some((n) => n.path === last.notePath)) {
     return last.notePath
   }
 

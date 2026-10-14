@@ -16,7 +16,7 @@ $sc = $Wsh.CreateShortcut($lnkPath)
 $sc.TargetPath = $bat
 $sc.WorkingDirectory = $AppRoot
 $sc.WindowStyle = 1
-$sc.Description = 'Start KnowledgeHub markdown viewer'
+$sc.Description = 'Start KnowledgeHub'
 if (Test-Path $IconPath) {
   $sc.IconLocation = "$IconPath,0"
 } else {
@@ -31,7 +31,7 @@ if ((Test-Path $desktopLnk) -and ($desktopLnk -ne $lnkPath)) {
   $sc2.TargetPath = $bat
   $sc2.WorkingDirectory = $AppRoot
   $sc2.WindowStyle = 1
-  $sc2.Description = 'Start KnowledgeHub markdown viewer'
+  $sc2.Description = 'Start KnowledgeHub'
   if (Test-Path $IconPath) {
     $sc2.IconLocation = "$IconPath,0"
   }
