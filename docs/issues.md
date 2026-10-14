@@ -33,3 +33,6 @@
 - [ ] Git: no init button for a workspace that is not a repository, no push or pull (push/pull need the user's approval first)
 - [ ] Code blocks have a language picker but no syntax highlighting (would need lowlight)
 - [ ] The code block picker view (`EditorCodeBlock`) has no rendering test, only Markdown round-trip tests
+- [ ] Renaming reads every note over IPC to rewrite links; move the pass into Rust or prefilter with a text search for big workspaces — `src/components/use-entry-operations.ts`
+- [ ] A link rewrite that fails for one note is only logged; tell the user which notes kept stale links
+- [ ] Git status uses two git calls and `--untracked-files=all` per refresh; merge into one call

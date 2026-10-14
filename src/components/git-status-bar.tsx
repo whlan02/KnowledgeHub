@@ -12,13 +12,12 @@ function useGitStatus() {
   const { activeFolderId, subscribeChanges } = useNotes()
   const [status, setStatus] = useState<GitStatus | null>(null)
   const timerRef = useRef<number | null>(null)
+  const latestRef = useRef(0)
 
   const refresh = useCallback(async () => {
-    try {
-      setStatus(await gitStatus())
-    } catch {
-      setStatus(null)
-    }
+    const ticket = ++latestRef.current
+    const next = await gitStatus().catch(() => null)
+    if (ticket === latestRef.current) setStatus(next)
   }, [])
 
   useEffect(() => {
@@ -33,6 +32,13 @@ function useGitStatus() {
       }),
     [subscribeChanges, refresh],
   )
+
+  // Commits and checkouts made elsewhere only touch .git, which the file watcher ignores.
+  useEffect(() => {
+    const onFocus = () => void refresh()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refresh])
 
   return { status, refresh }
 }
@@ -66,7 +72,8 @@ function CommitPanel({
 
   useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
-      if (!panelRef.current?.contains(event.target as Node)) onClose()
+      const target = event.target as Element
+      if (!panelRef.current?.contains(target) && !target.closest('[data-git-toggle]')) onClose()
     }
     window.addEventListener('pointerdown', onPointerDown)
     return () => window.removeEventListener('pointerdown', onPointerDown)
@@ -138,6 +145,7 @@ export function GitStatusBar() {
       </span>
       <button
         type="button"
+        data-git-toggle
         disabled={count === 0}
         onClick={() => setOpen((v) => !v)}
         className="rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground disabled:hover:bg-transparent disabled:hover:text-muted-foreground"

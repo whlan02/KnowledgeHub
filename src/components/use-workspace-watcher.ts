@@ -49,8 +49,8 @@ export function useWorkspaceWatcher({
       for (const path of paths) contentCacheRef.current.delete(path)
       try {
         const next = await scanWorkspace()
-        if (!disposed) applyScan(next, setNotes, setFolders)
-        else return
+        if (disposed) return
+        applyScan(next, setNotes, setFolders)
       } catch {
         // The workspace may be mid-switch; the next event will retry.
       }

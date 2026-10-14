@@ -30,7 +30,7 @@ fn ensure_repo(root: &Path) -> Result<(), String> {
 
 fn git(root: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = Command::new("git");
-    command.arg("-C").arg(root).args(["-c", "core.quotepath=off"]).args(args);
+    command.arg("-C").arg(root).args(["--no-optional-locks", "-c", "core.quotepath=off"]).args(args);
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;

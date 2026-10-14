@@ -71,4 +71,18 @@ describe('GitStatusBar', () => {
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'gitCommit' })))
     expect(screen.getByText('Author identity unknown')).toBeTruthy()
   })
+
+  it('closes the panel when the change count is clicked again', async () => {
+    mocks.status.mockResolvedValue(dirty)
+    render(<GitStatusBar />)
+    const toggle = await screen.findByText('gitChanges:1')
+    const press = () => {
+      fireEvent.pointerDown(toggle)
+      fireEvent.click(toggle)
+    }
+    press()
+    expect(screen.queryByPlaceholderText('gitMessagePlaceholder')).not.toBeNull()
+    press()
+    expect(screen.queryByPlaceholderText('gitMessagePlaceholder')).toBeNull()
+  })
 })

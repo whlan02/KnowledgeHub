@@ -44,35 +44,47 @@ function writeSegments(path: string, encode: boolean) {
     .join('/')
 }
 
+/** The link target as it should read after the move, or null when it can stay as written. */
+function rewriteHref(href: string, oldPath: string, newPath: string, from: string, to: string) {
+  if (href.startsWith('#') || EXTERNAL.test(href)) return null
+  const split = href.search(/[#?]/)
+  const pathPart = split < 0 ? href : href.slice(0, split)
+  const suffix = split < 0 ? '' : href.slice(split)
+  if (!pathPart) return null
+  const target = resolveFrom(oldPath, pathPart)
+  const moved = remapPath(target, from, to)
+  if (moved === target && oldPath === newPath) return null
+  const next = writeSegments(relativeFrom(newPath, moved), pathPart.includes('%'))
+  const prefix = pathPart.startsWith('./') && !next.startsWith('.') ? './' : ''
+  const trailing = pathPart.endsWith('/') && !next.endsWith('/') ? '/' : ''
+  return prefix + next + trailing + suffix
+}
+
+/** Apply `change` to the parts of `line` that are not inline code. */
+function outsideInlineCode(line: string, change: (text: string) => string) {
+  return line
+    .split(/(`+[^`]*`+)/)
+    .map((part, index) => (index % 2 === 1 ? part : change(part)))
+    .join('')
+}
+
 /**
  * Text of the note after `from` was renamed or moved to `to`. The note itself moved from
  * `oldPath` to `newPath` (the same path when it stayed); every relative link is re-pointed so
  * it still reaches the same file. Anchors, query strings, external links and code are untouched.
  */
 export function rewriteLinks(text: string, oldPath: string, newPath: string, from: string, to: string) {
+  const relink = (part: string) =>
+    part.replace(LINK, (whole, open: string, lt: string, href: string, gt: string, close: string) => {
+      const next = rewriteHref(href, oldPath, newPath, from, to)
+      return next === null || next === href ? whole : `${open}${lt}${next}${gt}${close}`
+    })
   let inFence = false
   return text
     .split('\n')
     .map((line) => {
       if (/^\s*(```|~~~)/.test(line)) inFence = !inFence
-      if (inFence) return line
-      return line.replace(LINK, (whole, open: string, lt: string, href: string, gt: string, close: string) => {
-        if (href.startsWith('#') || EXTERNAL.test(href)) return whole
-        const split = href.search(/[#?]/)
-        const pathPart = split < 0 ? href : href.slice(0, split)
-        const suffix = split < 0 ? '' : href.slice(split)
-        if (!pathPart) return whole
-        const target = resolveFrom(oldPath, pathPart)
-        const moved = remapPath(target, from, to)
-        if (moved === target && oldPath === newPath) return whole
-        const next = writeSegments(relativeFrom(newPath, moved), pathPart.includes('%'))
-        const prefix = pathPart.startsWith('./') && !next.startsWith('.') ? './' : ''
-        const trailing = pathPart.endsWith('/') && !next.endsWith('/') ? '/' : ''
-        if (resolveFrom(newPath, prefix + next + trailing) === moved && prefix + next + trailing === pathPart) {
-          return whole
-        }
-        return `${open}${lt}${prefix}${next}${trailing}${suffix}${gt}${close}`
-      })
+      return inFence ? line : outsideInlineCode(line, relink)
     })
     .join('\n')
 }

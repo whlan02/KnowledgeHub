@@ -33,6 +33,10 @@ describe('rewriteLinks', () => {
     expect(rewriteLinks(text, 'x.md', 'x.md', 'b.md', 'c.md')).toBe(text)
   })
 
+  it('leaves links written inside inline code alone', () => {
+    expect(rewriteLinks('`[a](b.md)` and [a](b.md)', 'x.md', 'x.md', 'b.md', 'c.md')).toBe('`[a](b.md)` and [a](c.md)')
+  })
+
   it('keeps percent-encoding and encodes spaces', () => {
     expect(rewriteLinks('[a](%E5%9B%BE.md)', 'x.md', 'x.md', '图.md', '新 图.md')).toBe('[a](%E6%96%B0%20%E5%9B%BE.md)')
     expect(rewriteLinks('[a](b.md)', 'x.md', 'x.md', 'b.md', 'my note.md')).toBe('[a](my%20note.md)')
