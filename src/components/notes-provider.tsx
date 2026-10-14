@@ -8,13 +8,18 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import i18n from '@/i18n'
 import type { Note } from '@/lib/fs-notes'
 import {
+  createFolderEntry,
+  createNoteFile,
   defaultWorkspace,
+  deleteEntry as deleteEntryFile,
   onWorkspaceChanged,
   openWorkspace,
   pickFolder,
   readNote,
+  renameEntry as renameEntryFile,
   scanWorkspace,
   workspaceFileUrl,
   writeNote,
@@ -29,12 +34,15 @@ import {
   touchRecentFolder,
   type RecentFolderEntry,
 } from '@/lib/recent-folders'
+import { isInside, joinPath, nameOf, parentOf, uniqueName } from '@/lib/path-ops'
 import { resolveAssetPath } from '@/lib/utils'
 
 type ChangeListener = (paths: string[]) => void
 
 type NotesContextValue = {
   notes: Note[]
+  /** Every folder in the workspace, including empty ones. */
+  folders: string[]
   folderLabel: string
   /** Absolute path of the open workspace; also used as its id. */
   activeFolderId: string | null
@@ -58,6 +66,18 @@ type NotesContextValue = {
   subscribeChanges: (listener: ChangeListener) => () => void
   resolveAssetUrl: (fromNotePath: string, src: string) => string
   notesPaths: Set<string>
+  /** Create an untitled note in `dir`; resolves to its path. */
+  createNote: (dir: string) => Promise<string>
+  /** Create an untitled folder in `dir`; resolves to its path. */
+  createFolder: (dir: string) => Promise<string>
+  /** Rename a note (the `.md` is added if missing) or folder; resolves to its new path. */
+  renameEntry: (path: string, newName: string) => Promise<string>
+  /** Move a note or folder into `targetDir`; resolves to its new path. */
+  moveEntry: (path: string, targetDir: string) => Promise<string>
+  /** Move a note or folder to the system trash. */
+  deleteEntry: (path: string) => Promise<void>
+  /** Open editors register a function that saves pending edits, run before files are moved. */
+  registerSaveFlusher: (flush: () => Promise<void>) => () => void
 }
 
 const NotesContext = createContext<NotesContextValue | null>(null)
@@ -72,8 +92,13 @@ function sameNotes(a: Note[], b: Note[]) {
   )
 }
 
+function sameList(a: string[], b: string[]) {
+  return a.length === b.length && a.every((item, i) => item === b[i])
+}
+
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([])
+  const [folders, setFolders] = useState<string[]>([])
   const [folderLabel, setFolderLabel] = useState('')
   const [activeFolderId, setActiveFolderId] = useState<string | null>(null)
   const [defaultRoot, setDefaultRoot] = useState<string | null>(null)
@@ -81,10 +106,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false)
   const contentCacheRef = useRef(new Map<string, string>())
   const listenersRef = useRef(new Set<ChangeListener>())
+  const flushersRef = useRef(new Set<() => Promise<void>>())
+  const notesRef = useRef(notes)
+  const foldersRef = useRef(folders)
+  notesRef.current = notes
+  foldersRef.current = folders
 
   const applyWorkspace = useCallback((info: WorkspaceInfo) => {
     contentCacheRef.current.clear()
     setNotes(info.notes)
+    setFolders(info.folders)
     setFolderLabel(info.name)
     setActiveFolderId(info.root)
     saveActiveWorkspace(info.root)
@@ -142,7 +173,8 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       try {
         const next = await scanWorkspace()
         if (disposed) return
-        setNotes((prev) => (sameNotes(prev, next) ? prev : next))
+        setNotes((prev) => (sameNotes(prev, next.notes) ? prev : next.notes))
+        setFolders((prev) => (sameList(prev, next.folders) ? prev : next.folders))
       } catch {
         // The workspace may be mid-switch; the next event will retry.
       }
@@ -227,11 +259,98 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     return rel ? workspaceFileUrl(rel) : src
   }, [])
 
+  const refresh = useCallback(async () => {
+    const next = await scanWorkspace()
+    setNotes((prev) => (sameNotes(prev, next.notes) ? prev : next.notes))
+    setFolders((prev) => (sameList(prev, next.folders) ? prev : next.folders))
+  }, [])
+
+  const registerSaveFlusher = useCallback((flush: () => Promise<void>) => {
+    flushersRef.current.add(flush)
+    return () => {
+      flushersRef.current.delete(flush)
+    }
+  }, [])
+
+  /** Save edits first, so a note that is about to move is not rewritten under its old name. */
+  const prepareToChangeFiles = useCallback(async () => {
+    await Promise.all([...flushersRef.current].map((flush) => flush()))
+  }, [])
+
+  const forgetCachedPaths = useCallback((path: string) => {
+    for (const cached of [...contentCacheRef.current.keys()]) {
+      if (isInside(cached, path)) contentCacheRef.current.delete(cached)
+    }
+  }, [])
+
+  const namesIn = useCallback((dir: string) => {
+    const all = [...notesRef.current.map((n) => n.path), ...foldersRef.current]
+    return all.filter((path) => parentOf(path) === dir).map(nameOf)
+  }, [])
+
+  const createNote = useCallback(
+    async (dir: string) => {
+      const title = i18n.t('untitledNote')
+      const path = joinPath(dir, uniqueName(title, '.md', namesIn(dir)))
+      await createNoteFile(path, `# ${title}\n\n`)
+      await refresh()
+      return path
+    },
+    [namesIn, refresh],
+  )
+
+  const createFolder = useCallback(
+    async (dir: string) => {
+      const path = joinPath(dir, uniqueName(i18n.t('untitledFolder'), '', namesIn(dir)))
+      await createFolderEntry(path)
+      await refresh()
+      return path
+    },
+    [namesIn, refresh],
+  )
+
+  const moveTo = useCallback(
+    async (from: string, to: string) => {
+      if (from === to) return to
+      await prepareToChangeFiles()
+      await renameEntryFile(from, to)
+      forgetCachedPaths(from)
+      await refresh()
+      return to
+    },
+    [forgetCachedPaths, prepareToChangeFiles, refresh],
+  )
+
+  const renameEntry = useCallback(
+    async (path: string, newName: string) => {
+      const isNote = notesRef.current.some((n) => n.path === path)
+      const name = isNote && !newName.toLowerCase().endsWith('.md') ? `${newName}.md` : newName
+      return moveTo(path, joinPath(parentOf(path), name))
+    },
+    [moveTo],
+  )
+
+  const moveEntry = useCallback(
+    (path: string, targetDir: string) => moveTo(path, joinPath(targetDir, nameOf(path))),
+    [moveTo],
+  )
+
+  const deleteEntry = useCallback(
+    async (path: string) => {
+      await prepareToChangeFiles()
+      await deleteEntryFile(path)
+      forgetCachedPaths(path)
+      await refresh()
+    },
+    [forgetCachedPaths, prepareToChangeFiles, refresh],
+  )
+
   const notesPaths = useMemo(() => new Set(notes.map((n) => n.path)), [notes])
 
   const value = useMemo<NotesContextValue>(
     () => ({
       notes,
+      folders,
       folderLabel,
       activeFolderId,
       isDefaultWorkspace: activeFolderId !== null && activeFolderId === defaultRoot,
@@ -248,9 +367,16 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       subscribeChanges,
       resolveAssetUrl,
       notesPaths,
+      createNote,
+      createFolder,
+      renameEntry,
+      moveEntry,
+      deleteEntry,
+      registerSaveFlusher,
     }),
     [
       notes,
+      folders,
       folderLabel,
       activeFolderId,
       defaultRoot,
@@ -267,6 +393,12 @@ export function NotesProvider({ children }: { children: ReactNode }) {
       subscribeChanges,
       resolveAssetUrl,
       notesPaths,
+      createNote,
+      createFolder,
+      renameEntry,
+      moveEntry,
+      deleteEntry,
+      registerSaveFlusher,
     ],
   )
 

@@ -35,7 +35,7 @@ export function NoteEditor({
   onDraft: (text: string) => void
 }) {
   const { t } = useTranslation()
-  const { saveNoteContent, readNoteFromDisk, subscribeChanges } = useNotes()
+  const { saveNoteContent, readNoteFromDisk, subscribeChanges, registerSaveFlusher } = useNotes()
   const [status, setStatus] = useState<SaveStatus>('idle')
   const draftRef = useRef(initialContent)
   /** What the editor serialises to when nothing has been typed since the last save. */
@@ -89,6 +89,19 @@ export function NoteEditor({
       savingRef.current = false
     }
   }
+
+  // Before a note is renamed, moved or deleted, write out what has been typed.
+  useEffect(
+    () =>
+      registerSaveFlusher(async () => {
+        if (timerRef.current !== null) {
+          window.clearTimeout(timerRef.current)
+          timerRef.current = null
+        }
+        if (draftRef.current !== savedRef.current) await persistRef.current(notePath, draftRef.current)
+      }),
+    [notePath, registerSaveFlusher],
+  )
 
   const editor = useEditor(
     {

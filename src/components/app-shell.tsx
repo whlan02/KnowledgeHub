@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronDown, FolderOpen, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
+import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
 import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
+import { useFileActions } from '@/components/use-file-actions'
 import { WindowControls } from '@/components/window-controls'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
 import { formatRecentOpenedAt } from '@/lib/format-recent'
+import { parentOf } from '@/lib/path-ops'
 import { cn } from '@/lib/utils'
 
 export function AppShell() {
@@ -25,7 +27,6 @@ export function AppShell() {
   const navigate = useNavigate()
   const { theme, setTheme } = useTheme()
   const {
-    notes,
     folderLabel,
     isDefaultWorkspace,
     recentFolders,
@@ -36,6 +37,8 @@ export function AppShell() {
     clearRecentFolderHistory,
     openDefaultWorkspace,
   } = useNotes()
+  const fileActions = useFileActions()
+  const [renameRequest, setRenameRequest] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [busy, setBusy] = useState(false)
 
@@ -43,6 +46,18 @@ export function AppShell() {
     localStorage.setItem('kh-lang', lng)
     void i18n.changeLanguage(lng)
   }
+
+  // Ctrl+N starts a note next to the one that is open.
+  const { newNote, openPath } = fileActions
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== 'n') return
+      event.preventDefault()
+      void newNote(openPath ? parentOf(openPath) : '')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [newNote, openPath])
 
   const onOpenFolder = async () => {
     try {
@@ -253,15 +268,37 @@ export function AppShell() {
             sidebarOpen ? 'w-[280px]' : 'w-0 overflow-hidden border-r-0',
           )}
         >
-          <div className="px-3 py-2">
-            <div className="text-xs font-medium tracking-wide text-muted-foreground">{t('files')}</div>
-            <div className="mt-1 truncate text-[11px] text-muted-foreground/80" title={folderLabel}>
-              {folderLabel}
+          <div className="flex items-center gap-1 px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-medium tracking-wide text-muted-foreground">{t('files')}</div>
+              <div className="mt-1 truncate text-[11px] text-muted-foreground/80" title={folderLabel}>
+                {folderLabel}
+              </div>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label={t('fileNewNote')}
+              title={`${t('fileNewNote')} (Ctrl+N)`}
+              onClick={() => void fileActions.newNote('')}
+            >
+              <FilePlus />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              aria-label={t('fileNewFolder')}
+              title={t('fileNewFolder')}
+              onClick={() => void fileActions.newFolder('').then(setRenameRequest)}
+            >
+              <FolderPlus />
+            </Button>
           </div>
           <Separator />
           <div className="min-h-0 flex-1">
-            <FileTree notes={notes} />
+            <FileTree renameRequest={renameRequest} />
           </div>
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
