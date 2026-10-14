@@ -53,6 +53,16 @@ export function searchNotes(query: string) {
   return invoke<SearchHit[]>('search_notes', { query })
 }
 
+/** Save an image next to a note; resolves to its path relative to the note (assets/name.png). */
+export function saveAsset(notePath: string, fileName: string, bytes: ArrayBuffer) {
+  return invoke<string>('save_asset', new Uint8Array(bytes), {
+    headers: {
+      'x-note-path': encodeURIComponent(notePath),
+      'x-file-name': encodeURIComponent(fileName),
+    },
+  })
+}
+
 /** Errors the backend reports for file operations; anything else is a system message. */
 export type FileErrorCode = 'ALREADY_EXISTS' | 'INVALID_NAME' | 'NOT_FOUND' | 'INVALID_TARGET'
 

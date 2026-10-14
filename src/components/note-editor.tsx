@@ -10,6 +10,9 @@ import { SelectionToolbar } from '@/components/selection-toolbar'
 import { SlashCommand } from '@/components/slash-menu'
 import { BlockSelection } from '@/lib/block-selection'
 import { documentExtensions } from '@/lib/document-extensions'
+import { saveAsset } from '@/lib/backend'
+import { fileErrorKey } from '@/lib/file-errors'
+import { ImageUpload, imageFileName, markdownImageSrc } from '@/lib/image-upload'
 import { toNoteMarkdown } from '@/lib/note-markdown'
 import {
   BlockShortcuts,
@@ -103,6 +106,18 @@ export function NoteEditor({
     [notePath, registerSaveFlusher],
   )
 
+  /** Save a pasted or dropped image next to this note; resolves to the path to put in the Markdown. */
+  const uploadImage = async (file: File) => {
+    try {
+      const saved = await saveAsset(notePath, imageFileName(file), await file.arrayBuffer())
+      return markdownImageSrc(saved)
+    } catch (err) {
+      console.error(err)
+      window.alert(t(fileErrorKey(err)))
+      return null
+    }
+  }
+
   const editor = useEditor(
     {
       extensions: [
@@ -110,6 +125,7 @@ export function NoteEditor({
         Placeholder.configure({
           placeholder: t('editorPlaceholder'),
         }),
+        ImageUpload.configure({ upload: uploadImage }),
         HeadingIds,
         BlockShortcuts,
         SlashCommand,

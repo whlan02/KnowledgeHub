@@ -9,6 +9,8 @@ pub const ALREADY_EXISTS: &str = "ALREADY_EXISTS";
 pub const INVALID_NAME: &str = "INVALID_NAME";
 pub const NOT_FOUND: &str = "NOT_FOUND";
 pub const INVALID_TARGET: &str = "INVALID_TARGET";
+pub const UNSUPPORTED_FILE: &str = "UNSUPPORTED_FILE";
+pub const FILE_TOO_LARGE: &str = "FILE_TOO_LARGE";
 
 /// Write via a temp file and rename so a crash never leaves a half-written note.
 pub fn write_atomic(full: &Path, text: &str) -> Result<(), String> {

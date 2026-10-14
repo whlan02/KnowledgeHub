@@ -129,6 +129,24 @@ fn rename_entry(state: State<Workspace>, from: String, to: String) -> Result<(),
     files::rename_entry(&resolve(&state, &from)?, &resolve(&state, &to)?, &to)
 }
 
+/// Save a pasted or dropped image next to the note. The image bytes are the raw request body;
+/// the note path and file name travel in (URI-encoded) headers.
+#[tauri::command]
+fn save_asset(state: State<Workspace>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let header = |name: &str| -> Result<String, String> {
+        let value = request
+            .headers()
+            .get(name)
+            .and_then(|v| v.to_str().ok())
+            .ok_or_else(|| format!("missing {name}"))?;
+        urlencoding::decode(value).map(|s| s.into_owned()).map_err(|e| e.to_string())
+    };
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err("expected raw bytes".into());
+    };
+    assets::store_asset(&current_root(&state)?, &header("x-note-path")?, &header("x-file-name")?, bytes)
+}
+
 /// Search the text of every note for `query` (case-insensitive).
 #[tauri::command]
 fn search_notes(state: State<Workspace>, query: String) -> Result<Vec<search::SearchHit>, String> {
@@ -172,7 +190,8 @@ pub fn run() {
             create_folder,
             rename_entry,
             delete_entry,
-            search_notes
+            search_notes,
+            save_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running KnowledgeHub");

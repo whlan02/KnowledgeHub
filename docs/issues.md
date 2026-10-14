@@ -26,3 +26,5 @@
 - [ ] Toggle / callout: what is inside them cannot be moved or selected as separate blocks; callout icons are fixed per type (no custom emoji)
 - [ ] Renaming or moving a note does not rewrite links to it in other notes; those links break (needs a workspace-wide link rewrite)
 - [ ] File tree: no multi-select, no keyboard rename (F2), no undo besides restoring from the system trash; expanded folders are forgotten when the workspace is switched
+- [ ] Images: no resize or caption, and images that are no longer used stay in the `assets` folder
+- [ ] Next up (autonomous plan): code block language picker, table row/column actions, equations, bookmarks, page appearance, release build + desktop shortcut

@@ -1,5 +1,12 @@
 /** Error codes the backend uses for file operations (see `src-tauri/src/files.rs`). */
-const CODES = ['ALREADY_EXISTS', 'INVALID_NAME', 'NOT_FOUND', 'INVALID_TARGET'] as const
+const CODES = [
+  'ALREADY_EXISTS',
+  'INVALID_NAME',
+  'NOT_FOUND',
+  'INVALID_TARGET',
+  'UNSUPPORTED_FILE',
+  'FILE_TOO_LARGE',
+] as const
 export type FileErrorCode = (typeof CODES)[number]
 
 /** The backend's error code inside `err`, or null for any other failure. */
