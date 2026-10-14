@@ -1,5 +1,6 @@
 mod assets;
 mod files;
+mod git;
 mod paths;
 mod scan;
 mod search;
@@ -159,6 +160,18 @@ fn delete_entry(state: State<Workspace>, path: String) -> Result<(), String> {
     files::trash_entry(&resolve(&state, &path)?)
 }
 
+/// Changed files and current branch of the workspace's Git repository.
+#[tauri::command]
+fn git_status(state: State<Workspace>) -> Result<git::GitStatus, String> {
+    git::status(&current_root(&state)?)
+}
+
+/// Commit every change locally. Nothing is pushed.
+#[tauri::command]
+fn git_commit(state: State<Workspace>, message: String) -> Result<(), String> {
+    git::commit_all(&current_root(&state)?, &message)
+}
+
 fn serve_asset(app: &AppHandle, request: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
     let root = current_root(&app.state::<Workspace>()).ok();
     let (status, body, mime) = assets::serve(root.as_deref(), request.uri().path());
@@ -191,7 +204,9 @@ pub fn run() {
             rename_entry,
             delete_entry,
             search_notes,
-            save_asset
+            save_asset,
+            git_status,
+            git_commit
         ])
         .run(tauri::generate_context!())
         .expect("error while running KnowledgeHub");

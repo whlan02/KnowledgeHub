@@ -6,6 +6,7 @@ import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
+import { GitStatusBar } from '@/components/git-status-bar'
 import { QuickOpen } from '@/components/quick-open'
 import { useFileActions } from '@/components/use-file-actions'
 import { WindowControls } from '@/components/window-controls'
@@ -328,6 +329,7 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      <GitStatusBar />
       <QuickOpen open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )

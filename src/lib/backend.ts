@@ -84,6 +84,22 @@ export function deleteEntry(path: string) {
   return invoke<void>('delete_entry', { path })
 }
 
+export type GitChange = {
+  path: string
+  kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+}
+export type GitStatus = { branch: string | null; changes: GitChange[] }
+
+/** Branch and changed files; rejects with NOT_A_REPO when the workspace is not under Git. */
+export function gitStatus() {
+  return invoke<GitStatus>('git_status')
+}
+
+/** Commit every change locally. Nothing is pushed. */
+export function gitCommit(message: string) {
+  return invoke<void>('git_commit', { message })
+}
+
 /** Native yes/no dialog. */
 export function confirmDialog(message: string, confirmLabel: string, cancelLabel: string) {
   return ask(message, { kind: 'warning', okLabel: confirmLabel, cancelLabel })
