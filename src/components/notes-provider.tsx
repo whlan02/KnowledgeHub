@@ -8,18 +8,14 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import i18n from '@/i18n'
+import { useEntryOperations } from '@/components/use-entry-operations'
+import { applyScan, useWorkspaceWatcher, type ChangeListener } from '@/components/use-workspace-watcher'
 import type { Note } from '@/lib/fs-notes'
 import {
-  createFolderEntry,
-  createNoteFile,
   defaultWorkspace,
-  deleteEntry as deleteEntryFile,
-  onWorkspaceChanged,
   openWorkspace,
   pickFolder,
   readNote,
-  renameEntry as renameEntryFile,
   scanWorkspace,
   workspaceFileUrl,
   writeNote,
@@ -34,11 +30,7 @@ import {
   touchRecentFolder,
   type RecentFolderEntry,
 } from '@/lib/recent-folders'
-import { rewriteLinks } from '@/lib/link-rewrite'
-import { isInside, joinPath, nameOf, parentOf, remapPath, uniqueName } from '@/lib/path-ops'
 import { resolveAssetPath } from '@/lib/utils'
-
-type ChangeListener = (paths: string[]) => void
 
 type NotesContextValue = {
   notes: Note[]
@@ -82,20 +74,6 @@ type NotesContextValue = {
 }
 
 const NotesContext = createContext<NotesContextValue | null>(null)
-
-/** Wait this long after the last file event before rescanning, so a burst becomes one scan. */
-const CHANGE_DEBOUNCE_MS = 200
-
-function sameNotes(a: Note[], b: Note[]) {
-  return (
-    a.length === b.length &&
-    a.every((n, i) => n.path === b[i].path && n.title === b[i].title)
-  )
-}
-
-function sameList(a: string[], b: string[]) {
-  return a.length === b.length && a.every((item, i) => item === b[i])
-}
 
 export function NotesProvider({ children }: { children: ReactNode }) {
   const [notes, setNotes] = useState<Note[]>([])
@@ -159,44 +137,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     }
   }, [applyWorkspace])
 
-  // Follow changes on disk: rescan the file list and tell open notes which paths changed.
-  useEffect(() => {
-    let timer: number | undefined
-    let disposed = false
-    let unlisten: (() => void) | undefined
-    const pending = new Set<string>()
-
-    const flush = async () => {
-      timer = undefined
-      const paths = [...pending]
-      pending.clear()
-      for (const path of paths) contentCacheRef.current.delete(path)
-      try {
-        const next = await scanWorkspace()
-        if (disposed) return
-        setNotes((prev) => (sameNotes(prev, next.notes) ? prev : next.notes))
-        setFolders((prev) => (sameList(prev, next.folders) ? prev : next.folders))
-      } catch {
-        // The workspace may be mid-switch; the next event will retry.
-      }
-      for (const listener of listenersRef.current) listener(paths)
-    }
-
-    void onWorkspaceChanged((paths) => {
-      for (const path of paths) pending.add(path)
-      window.clearTimeout(timer)
-      timer = window.setTimeout(() => void flush(), CHANGE_DEBOUNCE_MS)
-    }).then((fn) => {
-      if (disposed) fn()
-      else unlisten = fn
-    })
-
-    return () => {
-      disposed = true
-      window.clearTimeout(timer)
-      unlisten?.()
-    }
-  }, [])
+  useWorkspaceWatcher({ contentCacheRef, listenersRef, setNotes, setFolders })
 
   const openFolder = useCallback(async () => {
     const picked = await pickFolder()
@@ -261,9 +202,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const refresh = useCallback(async () => {
-    const next = await scanWorkspace()
-    setNotes((prev) => (sameNotes(prev, next.notes) ? prev : next.notes))
-    setFolders((prev) => (sameList(prev, next.folders) ? prev : next.folders))
+    applyScan(await scanWorkspace(), setNotes, setFolders)
   }, [])
 
   const registerSaveFlusher = useCallback((flush: () => Promise<void>) => {
@@ -278,90 +217,13 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     await Promise.all([...flushersRef.current].map((flush) => flush()))
   }, [])
 
-  const forgetCachedPaths = useCallback((path: string) => {
-    for (const cached of [...contentCacheRef.current.keys()]) {
-      if (isInside(cached, path)) contentCacheRef.current.delete(cached)
-    }
-  }, [])
-
-  const namesIn = useCallback((dir: string) => {
-    const all = [...notesRef.current.map((n) => n.path), ...foldersRef.current]
-    return all.filter((path) => parentOf(path) === dir).map(nameOf)
-  }, [])
-
-  const createNote = useCallback(
-    async (dir: string) => {
-      const title = i18n.t('untitledNote')
-      const path = joinPath(dir, uniqueName(title, '.md', namesIn(dir)))
-      await createNoteFile(path, `# ${title}\n\n`)
-      await refresh()
-      return path
-    },
-    [namesIn, refresh],
-  )
-
-  const createFolder = useCallback(
-    async (dir: string) => {
-      const path = joinPath(dir, uniqueName(i18n.t('untitledFolder'), '', namesIn(dir)))
-      await createFolderEntry(path)
-      await refresh()
-      return path
-    },
-    [namesIn, refresh],
-  )
-
-  /** Re-point links in every note so they still reach what was renamed or moved. */
-  const rewriteLinksAfterMove = useCallback(async (oldPaths: string[], from: string, to: string) => {
-    for (const oldPath of oldPaths) {
-      const newPath = remapPath(oldPath, from, to)
-      try {
-        const text = await readNote(newPath)
-        const next = rewriteLinks(text, oldPath, newPath, from, to)
-        if (next !== text) await writeNote(newPath, next)
-        contentCacheRef.current.delete(newPath)
-      } catch (err) {
-        console.error(err)
-      }
-    }
-  }, [])
-
-  const moveTo = useCallback(
-    async (from: string, to: string) => {
-      if (from === to) return to
-      await prepareToChangeFiles()
-      const before = notesRef.current.map((n) => n.path)
-      await renameEntryFile(from, to)
-      forgetCachedPaths(from)
-      await rewriteLinksAfterMove(before, from, to)
-      await refresh()
-      return to
-    },
-    [forgetCachedPaths, prepareToChangeFiles, refresh, rewriteLinksAfterMove],
-  )
-
-  const renameEntry = useCallback(
-    async (path: string, newName: string) => {
-      const isNote = notesRef.current.some((n) => n.path === path)
-      const name = isNote && !newName.toLowerCase().endsWith('.md') ? `${newName}.md` : newName
-      return moveTo(path, joinPath(parentOf(path), name))
-    },
-    [moveTo],
-  )
-
-  const moveEntry = useCallback(
-    (path: string, targetDir: string) => moveTo(path, joinPath(targetDir, nameOf(path))),
-    [moveTo],
-  )
-
-  const deleteEntry = useCallback(
-    async (path: string) => {
-      await prepareToChangeFiles()
-      await deleteEntryFile(path)
-      forgetCachedPaths(path)
-      await refresh()
-    },
-    [forgetCachedPaths, prepareToChangeFiles, refresh],
-  )
+  const { createNote, createFolder, renameEntry, moveEntry, deleteEntry } = useEntryOperations({
+    notesRef,
+    foldersRef,
+    contentCacheRef,
+    prepareToChangeFiles,
+    refresh,
+  })
 
   const notesPaths = useMemo(() => new Set(notes.map((n) => n.path)), [notes])
 

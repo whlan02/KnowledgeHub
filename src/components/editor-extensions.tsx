@@ -160,6 +160,7 @@ function CodeBlockView({ node, updateAttributes, editor }: ReactNodeViewProps) {
         ))}
       </select>
       <pre>
+        {/* NodeViewContent is typed for div only, but `pre code` is what the Markdown styles expect. */}
         <NodeViewContent as={'code' as 'div'} />
       </pre>
     </NodeViewWrapper>

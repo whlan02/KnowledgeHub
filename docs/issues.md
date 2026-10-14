@@ -28,3 +28,8 @@
 - [ ] File tree: no multi-select, no keyboard rename (F2), no undo besides restoring from the system trash; expanded folders are forgotten when the workspace is switched
 - [ ] Images: no resize or caption, and images that are no longer used stay in the `assets` folder
 - [ ] Next up (autonomous plan): code block language picker, table row/column actions, equations, bookmarks, page appearance, release build + desktop shortcut
+- [ ] Link rewriting on rename skips links whose target has spaces or parentheses written raw, and reference-style links (`[a]: b.md`) — `src/lib/link-rewrite.ts`
+- [ ] Git bar is hidden when the workspace is a subfolder of a larger repository (only a `.git` in the workspace root counts) — `src-tauri/src/git.rs`
+- [ ] Git: no init button for a workspace that is not a repository, no push or pull (push/pull need the user's approval first)
+- [ ] Code blocks have a language picker but no syntax highlighting (would need lowlight)
+- [ ] The code block picker view (`EditorCodeBlock`) has no rendering test, only Markdown round-trip tests
