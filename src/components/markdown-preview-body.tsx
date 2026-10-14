@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSlug from 'rehype-slug'
 import type { Components } from 'react-markdown'
+import { stripColorTags } from '@/lib/colors'
 import { cn } from '@/lib/utils'
 
 /** Compact Markdown render for hover preview windows (no nested link previews). */
@@ -39,7 +40,7 @@ export function MarkdownPreviewBody({
   return (
     <div className={cn('markdown-body markdown-preview-body', className)}>
       <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSlug]} skipHtml components={components}>
-        {content}
+        {stripColorTags(content)}
       </ReactMarkdown>
     </div>
   )

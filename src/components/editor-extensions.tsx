@@ -23,7 +23,9 @@ import {
   duplicateBlocks,
   turnIntoBlocks,
 } from '@/lib/block-actions'
-import { targetBlocks } from '@/lib/block-selection'
+import { selectedBlocks, targetBlocks } from '@/lib/block-selection'
+import { colorBlocks, colorSelection } from '@/lib/color-actions'
+import { loadLastColor } from '@/lib/colors'
 import { OPEN_BLOCK_MENU_EVENT, OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { useNotes } from '@/components/notes-provider'
 import { LinkPreviewAnchor } from '@/components/link-preview-anchor'
@@ -153,6 +155,14 @@ export const BlockShortcuts = Extension.create({
       ...turnShortcuts,
       'Mod-/': () => {
         this.editor.view.dom.dispatchEvent(new CustomEvent(OPEN_BLOCK_MENU_EVENT))
+        return true
+      },
+      'Mod-Shift-h': () => {
+        const last = loadLastColor()
+        if (!last) return true
+        const hasTextSelection = !this.editor.state.selection.empty && !selectedBlocks(this.editor.state)
+        if (hasTextSelection) colorSelection(this.editor, last.target, last.color)
+        else colorBlocks(this.editor, targetBlocks(this.editor), last.target, last.color)
         return true
       },
       'Mod-k': () => {

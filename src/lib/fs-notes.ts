@@ -1,3 +1,5 @@
+import { stripColorTags } from '@/lib/colors'
+
 export type Note = {
   id: string
   /** Path relative to the workspace root, always with `/`. */
@@ -8,5 +10,5 @@ export type Note = {
 
 export function titleFromContent(content: string, fallback: string) {
   const match = content.match(/^#\s+(.+)$/m)
-  return match ? match[1].trim() : fallback
+  return match ? stripColorTags(match[1]).trim() : fallback
 }

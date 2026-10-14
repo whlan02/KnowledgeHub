@@ -1,4 +1,5 @@
 import GithubSlugger from 'github-slugger'
+import { stripColorTags } from '@/lib/colors'
 
 export type TocItem = {
   id: string
@@ -9,7 +10,7 @@ export type TocItem = {
 const HEADING_RE = /^(#{2,4})\s+(.+)$/gm
 
 export function headingSlugText(text: string) {
-  return text.replace(/\s+#*\s*$/, '').replace(/\*\*/g, '').trim()
+  return stripColorTags(text).replace(/\s+#*\s*$/, '').replace(/\*\*/g, '').trim()
 }
 
 export function extractToc(markdown: string): TocItem[] {

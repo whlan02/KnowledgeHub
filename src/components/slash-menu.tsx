@@ -3,14 +3,25 @@ import { useTranslation } from 'react-i18next'
 import { Extension, type Editor, type Range } from '@tiptap/core'
 import { ReactRenderer } from '@tiptap/react'
 import Suggestion, { type SuggestionKeyDownProps, type SuggestionProps } from '@tiptap/suggestion'
-import { currentBlockPos, turnInto, type BlockTypeId } from '@/lib/block-actions'
 import { rememberSlashChoice, slashItems, type SlashItem } from '@/lib/slash-items'
 import { BLOCK_ICONS } from '@/components/block-icons'
-import { shortcutHint } from '@/components/block-menu'
+import { ColorSwatch } from '@/components/color-menu'
 import { cn } from '@/lib/utils'
 
 const POPUP_GAP_PX = 6
 const VIEWPORT_MARGIN_PX = 8
+
+const GROUP_TITLES: Record<SlashItem['group'], string> = {
+  recent: 'slashRecent',
+  basic: 'slashBasic',
+  color: 'slashColors',
+}
+
+function SlashItemIcon({ icon }: { icon: SlashItem['icon'] }) {
+  if (icon.kind === 'swatch') return <ColorSwatch target={icon.target} color={icon.color} />
+  const Icon = BLOCK_ICONS[icon.id]
+  return <Icon className="size-4 shrink-0 opacity-70" />
+}
 
 type SlashMenuHandle = { onKeyDown: (event: KeyboardEvent) => boolean }
 
@@ -55,13 +66,12 @@ const SlashMenuList = forwardRef<SlashMenuHandle, SuggestionProps<SlashItem, Sla
           <p className="px-2 py-2 text-sm text-muted-foreground">{t('slashNoResults')}</p>
         )}
         {items.map((item, index) => {
-          const Icon = BLOCK_ICONS[item.type.id]
-          const showHeader = index === 0 || items[index - 1].recent !== item.recent
+          const showHeader = index === 0 || items[index - 1].group !== item.group
           return (
-            <div key={item.type.id}>
+            <div key={item.id}>
               {showHeader && (
                 <div className="px-2 pb-1 pt-1.5 text-xs text-muted-foreground">
-                  {item.recent ? t('slashRecent') : t('slashBasic')}
+                  {t(GROUP_TITLES[item.group])}
                 </div>
               )}
               <button
@@ -76,11 +86,9 @@ const SlashMenuList = forwardRef<SlashMenuHandle, SuggestionProps<SlashItem, Sla
                 onMouseEnter={() => setSelected(index)}
                 onClick={() => command(item)}
               >
-                <Icon className="size-4 shrink-0 opacity-70" />
-                <span className="flex-1 truncate">{t(item.type.labelKey)}</span>
-                <span className="text-xs text-muted-foreground">
-                  {shortcutHint(item.type.shortcutDigit)}
-                </span>
+                <SlashItemIcon icon={item.icon} />
+                <span className="flex-1 truncate">{item.label}</span>
+                <span className="text-xs text-muted-foreground">{item.shortcut}</span>
               </button>
             </div>
           )
@@ -140,14 +148,10 @@ function renderSlashMenu() {
   }
 }
 
-function applySlashChoice(editor: Editor, range: Range, id: BlockTypeId) {
-  rememberSlashChoice(id)
+function applySlashChoice(editor: Editor, range: Range, item: SlashItem) {
+  rememberSlashChoice(item.id)
   editor.chain().focus().deleteRange(range).run()
-  if (id === 'divider') {
-    editor.chain().focus().setHorizontalRule().run()
-  } else {
-    turnInto(editor, currentBlockPos(editor), id)
-  }
+  item.apply(editor)
 }
 
 /** Typing `/` opens a menu of blocks, filtered as you type; Esc closes it. */
@@ -160,7 +164,7 @@ export const SlashCommand = Extension.create({
         char: '/',
         allow: ({ state, range }) => !state.doc.resolve(range.from).parent.type.spec.code,
         items: ({ query }) => slashItems(query),
-        command: ({ editor, range, props }) => applySlashChoice(editor, range, props.type.id),
+        command: ({ editor, range, props }) => applySlashChoice(editor, range, props),
         render: renderSlashMenu,
       }),
     ]

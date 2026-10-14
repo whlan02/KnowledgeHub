@@ -7,6 +7,7 @@ import {
   Copy,
   CopyPlus,
   Link2,
+  Palette,
   Repeat2,
   Scissors,
   Trash2,
@@ -22,8 +23,10 @@ import {
   type BlockTypeId,
 } from '@/lib/block-actions'
 import type { BlockRef } from '@/lib/block-tree'
+import { colorBlocks } from '@/lib/color-actions'
 import { readClipboardText } from '@/lib/backend'
 import { BLOCK_ICONS } from '@/components/block-icons'
+import { ColorPicker } from '@/components/color-menu'
 import { MenuItem, MenuPanel } from '@/components/menu-panel'
 
 export type BlockMenuState = {
@@ -126,7 +129,7 @@ export function BlockMenu({
   onClose: (restoreCursor: boolean) => void
 }) {
   const { t } = useTranslation()
-  const [turnIntoOpen, setTurnIntoOpen] = useState(false)
+  const [submenu, setSubmenu] = useState<'turnInto' | 'color' | null>(null)
   const last = menu.blocks.at(-1)
   if (!last) return null
 
@@ -156,10 +159,10 @@ export function BlockMenu({
           <MenuItem
             icon={Repeat2}
             label={t('blockTurnInto')}
-            onSelect={() => setTurnIntoOpen((open) => !open)}
+            onSelect={() => setSubmenu((open) => (open === 'turnInto' ? null : 'turnInto'))}
             trailing={<ChevronRight className="size-4 opacity-50" />}
           />
-          {turnIntoOpen && (
+          {submenu === 'turnInto' && (
             <div className="absolute left-full top-0 ml-1 min-w-[12rem] rounded-md border bg-popover p-1 shadow-md">
               <TypeList
                 types={TURN_INTO_TYPES}
@@ -169,6 +172,21 @@ export function BlockMenu({
           )}
         </div>
       )}
+      <div className="relative">
+        <MenuItem
+          icon={Palette}
+          label={t('blockColor')}
+          onSelect={() => setSubmenu((open) => (open === 'color' ? null : 'color'))}
+          trailing={<ChevronRight className="size-4 opacity-50" />}
+        />
+        {submenu === 'color' && (
+          <div className="absolute left-full top-0 ml-1 rounded-md border bg-popover p-1 shadow-md">
+            <ColorPicker
+              onPick={(target, color) => run(() => colorBlocks(editor, menu.blocks, target, color))}
+            />
+          </div>
+        )}
+      </div>
       <MenuItem
         icon={CopyPlus}
         label={t('blockDuplicate')}

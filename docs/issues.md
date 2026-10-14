@@ -20,3 +20,6 @@
 - [ ] Block selection: Tab / Shift+Tab nest or un-nest only list items (with the caret in them), not a whole selection or other blocks
 - [ ] Block selection: copying selected blocks copies the text between the first and last block; the margin drag does not auto-scroll
 - [ ] Right-click menu replaces the native one, so spell-check suggestions are not available
+- [ ] Colors: a block color colors the block's text runs, so text typed later in the block is not colored; inline code cannot be colored (TipTap's code mark excludes other marks)
+- [ ] Colors: hover preview cards drop the color tags instead of rendering them; GitHub shows the `{red}` tags literally (the chosen trade-off)
+- [ ] Colors: the picker has no "remove all colors" entry and does not show which color the selection already has

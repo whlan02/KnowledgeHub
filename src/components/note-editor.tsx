@@ -17,6 +17,7 @@ import { BlockMarquee } from '@/components/block-marquee'
 import { SelectionToolbar } from '@/components/selection-toolbar'
 import { SlashCommand } from '@/components/slash-menu'
 import { BlockSelection } from '@/lib/block-selection'
+import { BackgroundColor, TextColor } from '@/lib/color-marks'
 import {
   BlockShortcuts,
   EditorLinkMark,
@@ -120,6 +121,8 @@ export function NoteEditor({
         Markdown,
         HeadingIds,
         MarkdownUnderline,
+        TextColor,
+        BackgroundColor,
         BlockShortcuts,
         SlashCommand,
         BlockSelection,

@@ -353,3 +353,108 @@
   background: color-mix(in oklab, #2383e2 14%, transparent);
   border-radius: 4px;
 }
+
+/* Colours for {red}text{/red} and {bg-red}text{/bg-red}; also used by the colour pickers */
+:root {
+  --kh-text-gray: #9b9a97;
+  --kh-bg-gray: #ebeced;
+  --kh-text-brown: #64473a;
+  --kh-bg-brown: #e9e5e3;
+  --kh-text-orange: #d9730d;
+  --kh-bg-orange: #faebdd;
+  --kh-text-yellow: #dfab01;
+  --kh-bg-yellow: #fbf3db;
+  --kh-text-green: #0f7b6c;
+  --kh-bg-green: #ddedea;
+  --kh-text-blue: #0b6e99;
+  --kh-bg-blue: #ddebf1;
+  --kh-text-purple: #6940a5;
+  --kh-bg-purple: #eae4f2;
+  --kh-text-pink: #ad1a72;
+  --kh-bg-pink: #f4dfeb;
+  --kh-text-red: #e03e3e;
+  --kh-bg-red: #fbe4e4;
+}
+.dark {
+  --kh-text-gray: #9b9a97;
+  --kh-bg-gray: #454b4e;
+  --kh-text-brown: #a27b5c;
+  --kh-bg-brown: #434040;
+  --kh-text-orange: #cb912f;
+  --kh-bg-orange: #594a3a;
+  --kh-text-yellow: #c29343;
+  --kh-bg-yellow: #59563b;
+  --kh-text-green: #4f9d8e;
+  --kh-bg-green: #354c4b;
+  --kh-text-blue: #529cca;
+  --kh-bg-blue: #364954;
+  --kh-text-purple: #9a6dd7;
+  --kh-bg-purple: #443f57;
+  --kh-text-pink: #e255a1;
+  --kh-bg-pink: #533b4c;
+  --kh-text-red: #df5452;
+  --kh-bg-red: #594141;
+}
+[data-text-color="gray"] {
+  color: var(--kh-text-gray);
+}
+[data-bg-color="gray"] {
+  background-color: var(--kh-bg-gray);
+  border-radius: 3px;
+}
+[data-text-color="brown"] {
+  color: var(--kh-text-brown);
+}
+[data-bg-color="brown"] {
+  background-color: var(--kh-bg-brown);
+  border-radius: 3px;
+}
+[data-text-color="orange"] {
+  color: var(--kh-text-orange);
+}
+[data-bg-color="orange"] {
+  background-color: var(--kh-bg-orange);
+  border-radius: 3px;
+}
+[data-text-color="yellow"] {
+  color: var(--kh-text-yellow);
+}
+[data-bg-color="yellow"] {
+  background-color: var(--kh-bg-yellow);
+  border-radius: 3px;
+}
+[data-text-color="green"] {
+  color: var(--kh-text-green);
+}
+[data-bg-color="green"] {
+  background-color: var(--kh-bg-green);
+  border-radius: 3px;
+}
+[data-text-color="blue"] {
+  color: var(--kh-text-blue);
+}
+[data-bg-color="blue"] {
+  background-color: var(--kh-bg-blue);
+  border-radius: 3px;
+}
+[data-text-color="purple"] {
+  color: var(--kh-text-purple);
+}
+[data-bg-color="purple"] {
+  background-color: var(--kh-bg-purple);
+  border-radius: 3px;
+}
+[data-text-color="pink"] {
+  color: var(--kh-text-pink);
+}
+[data-bg-color="pink"] {
+  background-color: var(--kh-bg-pink);
+  border-radius: 3px;
+}
+[data-text-color="red"] {
+  color: var(--kh-text-red);
+}
+[data-bg-color="red"] {
+  background-color: var(--kh-bg-red);
+  border-radius: 3px;
+}

@@ -10,15 +10,18 @@ import {
   Italic,
   Link2,
   Link2Off,
+  Palette,
   Strikethrough,
   Underline,
   type LucideIcon,
 } from 'lucide-react'
 import { currentBlockPos, turnInto, type BlockTypeId } from '@/lib/block-actions'
+import { colorSelection } from '@/lib/color-actions'
 import { OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { cn } from '@/lib/utils'
 import { BLOCK_ICONS } from '@/components/block-icons'
 import { TURN_INTO_TYPES, TypeList } from '@/components/block-menu'
+import { ColorPicker } from '@/components/color-menu'
 import { MenuPanel } from '@/components/menu-panel'
 
 const BLOCK_TYPE_OF_ACTIVE: { active: (editor: Editor) => boolean; id: BlockTypeId }[] = [
@@ -52,7 +55,7 @@ function ToolbarButton({
   icon: LucideIcon
   label: string
   active?: boolean
-  onClick: () => void
+  onClick: (rect: DOMRect) => void
 }) {
   return (
     <button
@@ -65,7 +68,7 @@ function ToolbarButton({
         active && 'bg-accent text-foreground',
       )}
       onMouseDown={(e) => e.preventDefault()}
-      onClick={onClick}
+      onClick={(e) => onClick(e.currentTarget.getBoundingClientRect())}
     >
       <Icon className="size-4" />
     </button>
@@ -110,6 +113,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
   const { t } = useTranslation()
   const [linkMode, setLinkMode] = useState(false)
   const [turnMenu, setTurnMenu] = useState<{ x: number; y: number } | null>(null)
+  const [colorMenu, setColorMenu] = useState<{ x: number; y: number } | null>(null)
 
   const state = useEditorState({
     editor,
@@ -180,6 +184,11 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
         onClick={run(() => editor.chain().toggleStrike().run())}
       />
       <ToolbarButton
+        icon={Palette}
+        label={t('toolbarColor')}
+        onClick={(rect) => setColorMenu({ x: rect.left, y: rect.bottom + 4 })}
+      />
+      <ToolbarButton
         icon={Code}
         label={t('toolbarCode')}
         active={state.code}
@@ -211,6 +220,16 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
           {bar}
         </div>
       </BubbleMenu>
+      {colorMenu && (
+        <MenuPanel x={colorMenu.x} y={colorMenu.y} onDismiss={() => setColorMenu(null)}>
+          <ColorPicker
+            onPick={(target, color) => {
+              setColorMenu(null)
+              colorSelection(editor, target, color)
+            }}
+          />
+        </MenuPanel>
+      )}
       {turnMenu && (
         <MenuPanel x={turnMenu.x} y={turnMenu.y} onDismiss={() => setTurnMenu(null)}>
           <TypeList

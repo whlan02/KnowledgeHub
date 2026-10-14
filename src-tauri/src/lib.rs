@@ -76,6 +76,26 @@ fn current_root(state: &Workspace) -> Result<PathBuf, String> {
         .ok_or_else(|| "no workspace open".to_string())
 }
 
+const COLOR_NAMES: [&str; 9] = [
+    "gray", "brown", "orange", "yellow", "green", "blue", "purple", "pink", "red",
+];
+
+/// Drop the `{red}…{/red}` / `{bg-red}…{/bg-red}` colour tags, keeping the text between them.
+fn strip_color_tags(text: &str) -> String {
+    let mut out = text.to_string();
+    for name in COLOR_NAMES {
+        for tag in [
+            format!("{{{name}}}"),
+            format!("{{/{name}}}"),
+            format!("{{bg-{name}}}"),
+            format!("{{/bg-{name}}}"),
+        ] {
+            out = out.replace(&tag, "");
+        }
+    }
+    out
+}
+
 /// First `# Heading` near the top of the file, which is how notes are titled in the sidebar.
 fn heading_title(file: &Path) -> Option<String> {
     use std::io::Read;
@@ -88,7 +108,7 @@ fn heading_title(file: &Path) -> Option<String> {
     String::from_utf8_lossy(&head)
         .lines()
         .find_map(|line| line.strip_prefix("# "))
-        .map(|title| title.trim().to_string())
+        .map(|title| strip_color_tags(title).trim().to_string())
         .filter(|title| !title.is_empty())
 }
 
