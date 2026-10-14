@@ -2,30 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Editor } from '@tiptap/core'
 import { EditorContent, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import { Markdown } from '@tiptap/markdown'
 import Placeholder from '@tiptap/extension-placeholder'
-import { Table } from '@tiptap/extension-table'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
-import TableRow from '@tiptap/extension-table-row'
-import TaskItem from '@tiptap/extension-task-item'
-import TaskList from '@tiptap/extension-task-list'
 import { useNotes } from '@/components/notes-provider'
 import { BlockHandle } from '@/components/block-handle'
 import { BlockMarquee } from '@/components/block-marquee'
 import { SelectionToolbar } from '@/components/selection-toolbar'
 import { SlashCommand } from '@/components/slash-menu'
 import { BlockSelection } from '@/lib/block-selection'
-import { Callout } from '@/lib/callout'
-import { BackgroundColor, TextColor } from '@/lib/color-marks'
-import { Toggle, ToggleContent, ToggleSummary } from '@/lib/toggle'
+import { documentExtensions } from '@/lib/document-extensions'
+import { toNoteMarkdown } from '@/lib/note-markdown'
 import {
   BlockShortcuts,
   EditorLinkMark,
   EditorNoteContext,
   HeadingIds,
-  MarkdownUnderline,
   WorkspaceImage,
 } from '@/components/editor-extensions'
 
@@ -103,32 +93,11 @@ export function NoteEditor({
   const editor = useEditor(
     {
       extensions: [
-        StarterKit.configure({
-          heading: { levels: [1, 2, 3, 4] },
-          link: false,
-          underline: false,
-          dropcursor: { color: '#2383e2', width: 2 },
-        }),
-        EditorLinkMark.configure({ openOnClick: false, autolink: true }),
+        ...documentExtensions({ link: EditorLinkMark, image: WorkspaceImage }),
         Placeholder.configure({
           placeholder: t('editorPlaceholder'),
         }),
-        TaskList,
-        TaskItem.configure({ nested: true }),
-        Table.configure({ resizable: false }),
-        TableRow,
-        TableHeader,
-        TableCell,
-        WorkspaceImage,
-        Markdown,
         HeadingIds,
-        MarkdownUnderline,
-        TextColor,
-        BackgroundColor,
-        Callout,
-        Toggle,
-        ToggleSummary,
-        ToggleContent,
         BlockShortcuts,
         SlashCommand,
         BlockSelection,
@@ -142,7 +111,7 @@ export function NoteEditor({
       },
       onCreate: ({ editor: created }) => {
         notePathByEditor.set(created, notePath)
-        const markdown = created.getMarkdown()
+        const markdown = toNoteMarkdown(created)
         draftRef.current = markdown
         savedRef.current = markdown
         diskRef.current = initialContent
@@ -150,7 +119,7 @@ export function NoteEditor({
       onUpdate: ({ editor: current }) => {
         const path = notePathByEditor.get(current)
         if (!path) return
-        const markdown = current.getMarkdown()
+        const markdown = toNoteMarkdown(current)
         draftRef.current = markdown
         onDraftRef.current(markdown)
         if (markdown === savedRef.current) return
@@ -176,7 +145,7 @@ export function NoteEditor({
       void readNoteFromDisk(notePath).then((text) => {
         if (text === null || text === diskRef.current || busy() || editor.isDestroyed) return
         editor.commands.setContent(text, { contentType: 'markdown', emitUpdate: false })
-        const markdown = editor.getMarkdown()
+        const markdown = toNoteMarkdown(editor)
         diskRef.current = text
         draftRef.current = markdown
         savedRef.current = markdown

@@ -4,17 +4,16 @@
 - [ ] `/` block menu and selection toolbar — rest of `docs/phase-1.md`
 - [ ] Links in the editor follow on plain click, which makes it hard to edit link text; add a link editor in the selection toolbar
 - [ ] Windows desktop shortcut still launches `tauri dev`; point it at the built exe once release builds are set up
-- [ ] No automated tests yet; start with Markdown round trip, `resolveNoteLink`, and Rust `safe_join`
 - [ ] Remove unused dependencies (`rehype-raw`, `remark-breaks`, `@radix-ui/react-tooltip`)
 - [ ] `react-markdown` is still used for hover preview cards only; render previews with a read-only TipTap instead
 - [ ] Block handle: dragging from the `+` button also drags the block (both buttons sit inside the draggable handle)
 - [ ] Block handle: inserting a divider below a list item splits the list in two
 - [ ] Block menu: no Color / Move to / word count yet (colors are step 4 of `docs/notion-page-features.md`)
 - [ ] Block menu: "Copy link to block" only works on headings, since only headings have stable ids
-- [ ] Block actions (`src/lib/block-actions.ts`) have no automated tests and the block-handle change has not been through `/code-review`
+- [ ] The block handle, block selection, colors and toggle/callout work has not been through `/code-review`
 - [ ] Slash menu: only block types so far; `/duplicate`, `/delete` and colors (`/red`) come with the color step
 - [ ] Selection toolbar: no color dropdown yet, no comment / @-mention
-- [ ] Slash menu and selection toolbar have no automated tests; the slash popup is placed by hand instead of floating-ui
+- [ ] The slash popup is placed by hand instead of floating-ui; the selection toolbar and slash menu UI have no component tests (their logic is covered in `slash-items` / `block-actions` tests)
 - [ ] Block selection: a selection that mixes a heading and a list's items is lifted to the whole list, so it is coarser than Notion's
 - [ ] Block selection: Shift+Up/Down cannot shrink a selection back across a list boundary; Alt+Shift+click (add or remove one block) is not implemented
 - [ ] Block selection: Tab / Shift+Tab nest or un-nest only list items (with the caret in them), not a whole selection or other blocks
@@ -25,4 +24,3 @@
 - [ ] Colors: the picker has no "remove all colors" entry and does not show which color the selection already has
 - [ ] Toggle: open / closed state is not saved (a toggle is closed when the note opens, `<details open>` is ignored); there are no toggle headings
 - [ ] Toggle / callout: what is inside them cannot be moved or selected as separate blocks; callout icons are fixed per type (no custom emoji)
-- [ ] Switching notes used to be able to write the previous note's text into the new file (stale body with the new path); fixed in `NotePage`, but there is no regression test for it

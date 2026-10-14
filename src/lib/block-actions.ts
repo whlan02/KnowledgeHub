@@ -204,7 +204,9 @@ export function moveBlocks(editor: Editor, blocks: BlockRef[], direction: -1 | 1
   const neighbour = direction === -1 ? span?.previous : span?.next
   if (!span || !neighbour) return null
   const size = neighbour.node.nodeSize
-  const cursorOffset = selection.from - span.start
+  // With blocks selected the caret may sit outside the run; then it goes to the run's start.
+  const caretInside = selection.from >= span.start && selection.from < span.end
+  const cursorOffset = caretInside ? selection.from - span.start : 0
 
   tr.delete(neighbour.pos, neighbour.pos + size)
   tr.insert(direction === -1 ? span.end - size : span.start, neighbour.node)

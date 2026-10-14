@@ -30,6 +30,8 @@ npm start        # = tauri dev; the first run compiles the Rust backend
 On Windows you can also double-click `Start-KnowledgeHub.bat`.
 
 ```bash
+npm test                 # front-end tests (Vitest)
+npm run test:rust        # Rust tests
 npm run tauri -- build   # release build + installer
 ```
 

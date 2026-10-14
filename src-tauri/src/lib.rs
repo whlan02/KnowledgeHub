@@ -250,20 +250,23 @@ fn read_note(state: State<Workspace>, path: String) -> Result<String, String> {
 }
 
 /// Write via a temp file and rename so a crash never leaves a half-written note.
-#[tauri::command]
-fn write_note(state: State<Workspace>, path: String, text: String) -> Result<(), String> {
-    let full = safe_join(&current_root(&state)?, &path)?;
+fn write_atomic(full: &Path, text: &str) -> Result<(), String> {
     if let Some(parent) = full.parent() {
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    let mut temp = full.clone().into_os_string();
+    let mut temp = full.to_path_buf().into_os_string();
     temp.push(TEMP_SUFFIX);
     let temp = PathBuf::from(temp);
     fs::write(&temp, text).map_err(|e| e.to_string())?;
-    fs::rename(&temp, &full).map_err(|e| {
+    fs::rename(&temp, full).map_err(|e| {
         let _ = fs::remove_file(&temp);
         e.to_string()
     })
+}
+
+#[tauri::command]
+fn write_note(state: State<Workspace>, path: String, text: String) -> Result<(), String> {
+    write_atomic(&safe_join(&current_root(&state)?, &path)?, &text)
 }
 
 fn mime_for(path: &Path) -> &'static str {
@@ -330,4 +333,141 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running KnowledgeHub");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A scratch workspace under the system temp dir, removed when dropped.
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new(name: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("kh-test-{name}-{}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir);
+            fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+
+        fn file(&self, rel: &str, text: &str) {
+            let full = self.0.join(rel);
+            fs::create_dir_all(full.parent().unwrap()).unwrap();
+            fs::write(full, text).unwrap();
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn safe_join_accepts_nested_relative_paths() {
+        let root = Path::new("root");
+        assert_eq!(safe_join(root, "a.md").unwrap(), root.join("a.md"));
+        assert_eq!(safe_join(root, "dir/sub/a.md").unwrap(), root.join("dir/sub/a.md"));
+    }
+
+    #[test]
+    fn safe_join_rejects_anything_that_could_escape_the_root() {
+        let root = Path::new("root");
+        for bad in ["", "..", "../secret.md", "a/../../b.md", "./a.md", "/etc/passwd", "C:\\Windows\\x"] {
+            assert!(safe_join(root, bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn hidden_and_dependency_folders_are_ignored() {
+        for ignored in [".git/config", "notes/.obsidian/a.md", "node_modules/x/a.md", "dist/a.md", "a.md.kh-tmp"] {
+            assert!(is_ignored(Path::new(ignored)), "{ignored:?} should be ignored");
+        }
+        for kept in ["a.md", "dir/a.md", "my.notes/a.md"] {
+            assert!(!is_ignored(Path::new(kept)), "{kept:?} should be kept");
+        }
+    }
+
+    #[test]
+    fn color_tags_are_removed_but_text_stays() {
+        assert_eq!(strip_color_tags("{red}Hot{/red} {bg-blue}topic{/bg-blue}"), "Hot topic");
+        assert_eq!(strip_color_tags("{braces} stay"), "{braces} stay");
+    }
+
+    #[test]
+    fn title_is_the_first_level_one_heading() {
+        let dir = Scratch::new("title");
+        dir.file("a.md", "intro\n\n# {red}Plan{/red}\n\n## Not this");
+        dir.file("b.md", "no heading at all");
+        dir.file("c.md", "## only a subheading");
+        assert_eq!(heading_title(&dir.0.join("a.md")).as_deref(), Some("Plan"));
+        assert_eq!(heading_title(&dir.0.join("b.md")), None);
+        assert_eq!(heading_title(&dir.0.join("c.md")), None);
+    }
+
+    #[test]
+    fn scan_lists_markdown_notes_sorted_and_skips_the_rest() {
+        let dir = Scratch::new("scan");
+        dir.file("b.md", "# Bee");
+        dir.file("A.md", "# Ay");
+        dir.file("guides/z.md", "# Zed");
+        dir.file("guides/pic.png", "not a note");
+        dir.file(".git/hooks.md", "# hidden");
+        dir.file("node_modules/pkg/readme.md", "# dependency");
+        dir.file("upper.MD", "# Upper");
+
+        let notes = scan(&dir.0);
+        let paths: Vec<&str> = notes.iter().map(|n| n.path.as_str()).collect();
+        assert_eq!(paths, ["A.md", "b.md", "guides/z.md", "upper.MD"]);
+        assert_eq!(notes[2].folder, "guides");
+        assert_eq!(notes[2].title, "Zed");
+        assert_eq!(notes[0].folder, "");
+    }
+
+    #[test]
+    fn note_without_a_heading_is_titled_by_its_file_name() {
+        let dir = Scratch::new("stem");
+        dir.file("plain note.md", "just text");
+        assert_eq!(scan(&dir.0)[0].title, "plain note");
+    }
+
+    #[test]
+    fn atomic_write_replaces_the_file_and_leaves_no_temp_file() {
+        let dir = Scratch::new("write");
+        dir.file("a.md", "old");
+        write_atomic(&dir.0.join("a.md"), "new text").unwrap();
+        assert_eq!(fs::read_to_string(dir.0.join("a.md")).unwrap(), "new text");
+        let leftovers: Vec<_> = fs::read_dir(&dir.0)
+            .unwrap()
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().ends_with(TEMP_SUFFIX))
+            .collect();
+        assert!(leftovers.is_empty());
+    }
+
+    #[test]
+    fn atomic_write_creates_missing_folders() {
+        let dir = Scratch::new("mkdir");
+        write_atomic(&dir.0.join("new/deep/a.md"), "hi").unwrap();
+        assert_eq!(fs::read_to_string(dir.0.join("new/deep/a.md")).unwrap(), "hi");
+    }
+
+    #[test]
+    fn copy_dir_copies_nested_files() {
+        let src = Scratch::new("copy-src");
+        src.file("a.md", "one");
+        src.file("sub/b.md", "two");
+        let dst = std::env::temp_dir().join(format!("kh-test-copy-dst-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dst);
+        copy_dir(&src.0, &dst).unwrap();
+        assert_eq!(fs::read_to_string(dst.join("sub/b.md")).unwrap(), "two");
+        let _ = fs::remove_dir_all(&dst);
+    }
+
+    #[test]
+    fn mime_types_follow_the_extension() {
+        assert_eq!(mime_for(Path::new("a.PNG")), "image/png");
+        assert_eq!(mime_for(Path::new("a.svg")), "image/svg+xml");
+        assert_eq!(mime_for(Path::new("a.bin")), "application/octet-stream");
+    }
 }

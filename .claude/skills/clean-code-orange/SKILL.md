@@ -52,7 +52,9 @@ description: KnowledgeHub 的编码规范,基于 Clean Code Developer 橙色等�
 
 - 要改的逻辑没有测试时,先写一个固定当前行为的测试,再改。
 - 优先测有价值的边界:Markdown 往返(读入再写回不丢内容)、链接解析、路径安全(`..`、绝对路径)、工作区扫描。
-- 项目目前没有测试框架。第一次需要测试时,前端用 Vitest,Rust 用 `cargo test`;引入框架前先告诉用户。
+- 前端测试用 Vitest(`npm test`,文件放在被测代码旁边,命名 `*.test.ts(x)`),Rust 测试用 `cargo test`(`npm run test:rust`,写在 `lib.rs` 底部的 `tests` 模块)。
+- 编辑器相关的测试用 `src/test/editor.ts` 里的无界面编辑器;Markdown 语法和块操作的测试是最容易补的。
+- 修 bug 时先写一个在旧代码上会失败的测试,再修。
 
 ### Reviews(评审)
 一个功能完成后、交付给用户前,让第二双眼睛看一遍。
