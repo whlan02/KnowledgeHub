@@ -338,6 +338,16 @@
   border-radius: 4px;
 }
 
+/* Blocks picked with Esc, Shift-click, or a drag in the margin */
+.note-editor .block-selected {
+  background: color-mix(in oklab, #2383e2 14%, transparent);
+  border-radius: 4px;
+}
+
+.note-editor.has-block-selection {
+  caret-color: transparent;
+}
+
 /* Block being dragged by its handle */
 .note-editor .ProseMirror-selectednode {
   background: color-mix(in oklab, #2383e2 14%, transparent);

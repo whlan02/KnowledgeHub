@@ -13,8 +13,10 @@ import TaskItem from '@tiptap/extension-task-item'
 import TaskList from '@tiptap/extension-task-list'
 import { useNotes } from '@/components/notes-provider'
 import { BlockHandle } from '@/components/block-handle'
+import { BlockMarquee } from '@/components/block-marquee'
 import { SelectionToolbar } from '@/components/selection-toolbar'
 import { SlashCommand } from '@/components/slash-menu'
+import { BlockSelection } from '@/lib/block-selection'
 import {
   BlockShortcuts,
   EditorLinkMark,
@@ -120,6 +122,7 @@ export function NoteEditor({
         MarkdownUnderline,
         BlockShortcuts,
         SlashCommand,
+        BlockSelection,
       ],
       content: initialContent,
       contentType: 'markdown',
@@ -195,6 +198,7 @@ export function NoteEditor({
         )}
         <EditorContent editor={editor} />
         {editor && <BlockHandle editor={editor} notePath={notePath} />}
+        {editor && <BlockMarquee editor={editor} />}
         {editor && <SelectionToolbar editor={editor} />}
       </div>
     </EditorNoteContext.Provider>

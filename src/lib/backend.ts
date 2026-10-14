@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { readText } from '@tauri-apps/plugin-clipboard-manager'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import type { Note } from '@/lib/fs-notes'
@@ -58,4 +59,9 @@ export function workspaceFileUrl(relPath: string) {
 
 export function openExternal(url: string) {
   return openUrl(url)
+}
+
+/** Text on the system clipboard (the webview's own clipboard API asks for permission). */
+export function readClipboardText() {
+  return readText()
 }

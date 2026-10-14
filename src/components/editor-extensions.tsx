@@ -20,10 +20,10 @@ import { openExternal } from '@/lib/backend'
 import { encodeNotePath, resolveNoteLink } from '@/lib/utils'
 import {
   BLOCK_TYPES,
-  currentBlockPos,
-  duplicateBlock,
-  turnInto,
+  duplicateBlocks,
+  turnIntoBlocks,
 } from '@/lib/block-actions'
+import { targetBlocks } from '@/lib/block-selection'
 import { OPEN_BLOCK_MENU_EVENT, OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { useNotes } from '@/components/notes-provider'
 import { LinkPreviewAnchor } from '@/components/link-preview-anchor'
@@ -144,7 +144,7 @@ export const BlockShortcuts = Extension.create({
       BLOCK_TYPES.filter((type) => type.shortcutDigit !== undefined).map((type) => [
         `Mod-Shift-${type.shortcutDigit}`,
         () => {
-          turnInto(this.editor, currentBlockPos(this.editor), type.id)
+          turnIntoBlocks(this.editor, targetBlocks(this.editor), type.id)
           return true
         },
       ]),
@@ -161,7 +161,7 @@ export const BlockShortcuts = Extension.create({
         return true
       },
       'Mod-d': () => {
-        duplicateBlock(this.editor, currentBlockPos(this.editor))
+        duplicateBlocks(this.editor, targetBlocks(this.editor))
         return true
       },
     }

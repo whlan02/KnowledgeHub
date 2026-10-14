@@ -1,6 +1,12 @@
 import type { Editor } from '@tiptap/core'
 import type { Node as ProseNode } from '@tiptap/pm/model'
-import { Selection } from '@tiptap/pm/state'
+import { TextSelection } from '@tiptap/pm/state'
+import {
+  blockPosAt,
+  runSpan,
+  selectionInside,
+  type BlockRef,
+} from '@/lib/block-tree'
 
 export type BlockTypeId =
   | 'paragraph'
@@ -46,9 +52,7 @@ export function canTurnInto(node: ProseNode) {
 }
 
 function selectInside(editor: Editor, pos: number) {
-  const { doc, tr } = editor.state
-  const $pos = doc.resolve(Math.min(pos + 1, doc.content.size))
-  editor.view.dispatch(tr.setSelection(Selection.near($pos, 1)))
+  editor.view.dispatch(editor.state.tr.setSelection(selectionInside(editor.state.doc, pos)))
 }
 
 function liftOutOfLists(editor: Editor) {
@@ -133,21 +137,53 @@ export function insertBelow(editor: Editor, pos: number, type: BlockTypeId) {
   turnInto(editor, end, type)
 }
 
-export function duplicateBlock(editor: Editor, pos: number) {
-  const node = editor.state.doc.nodeAt(pos)
-  if (!node) return
-  editor
-    .chain()
-    .insertContentAt(pos + node.nodeSize, node.toJSON())
-    .focus()
-    .run()
+/** Turn every block into `type`. Later blocks go first so earlier positions stay valid. */
+export function turnIntoBlocks(editor: Editor, blocks: BlockRef[], type: BlockTypeId) {
+  for (const block of [...blocks].reverse()) turnInto(editor, block.pos, type)
 }
 
-export function deleteBlock(editor: Editor, pos: number) {
-  const node = editor.state.doc.nodeAt(pos)
-  if (!node) return
-  editor.view.dispatch(editor.state.tr.delete(pos, pos + node.nodeSize))
+/** Copy a run of sibling blocks and insert the copy right after it. */
+export function duplicateBlocks(editor: Editor, blocks: BlockRef[]) {
+  const span = runSpan(editor.state.doc, blocks)
+  if (!span) return
+  const copy = editor.state.doc.slice(span.start, span.end).content.toJSON()
+  editor.chain().insertContentAt(span.end, copy).focus().run()
+}
+
+/** Delete a run of sibling blocks; a list or document left empty goes away or gets a blank line. */
+export function deleteBlocks(editor: Editor, blocks: BlockRef[]) {
+  const { doc, tr } = editor.state
+  const span = runSpan(doc, blocks)
+  if (!span) return
+  if (span.coversParent && span.parentDepth === 0) {
+    tr.replaceWith(0, doc.content.size, editor.schema.nodes.paragraph.create())
+  } else if (span.coversParent) {
+    tr.delete(span.parentStart, span.parentEnd)
+  } else {
+    tr.delete(span.start, span.end)
+  }
+  editor.view.dispatch(tr)
   editor.commands.focus()
+}
+
+/**
+ * Swap a run of sibling blocks with the block above or below it. Returns how far the run moved,
+ * or null when it is already at the edge.
+ */
+export function moveBlocks(editor: Editor, blocks: BlockRef[], direction: -1 | 1) {
+  const { doc, tr, selection } = editor.state
+  const span = runSpan(doc, blocks)
+  const neighbour = direction === -1 ? span?.previous : span?.next
+  if (!span || !neighbour) return null
+  const size = neighbour.node.nodeSize
+  const cursorOffset = selection.from - span.start
+
+  tr.delete(neighbour.pos, neighbour.pos + size)
+  tr.insert(direction === -1 ? span.end - size : span.start, neighbour.node)
+  const delta = direction * size
+  const caret = Math.min(span.start + delta + cursorOffset, tr.doc.content.size)
+  editor.view.dispatch(tr.setSelection(TextSelection.near(tr.doc.resolve(caret), 1)))
+  return delta
 }
 
 /** Markdown link to a heading in this note, or null if the block is not a heading with an id. */
@@ -169,9 +205,5 @@ export function restoreCursor(editor: Editor, pos: number) {
 
 /** Position of the block the cursor is in: the innermost list item, else the top-level block. */
 export function currentBlockPos(editor: Editor) {
-  const { $from } = editor.state.selection
-  for (let depth = $from.depth; depth >= 1; depth -= 1) {
-    if (LIST_ITEM_NODES.includes($from.node(depth).type.name)) return $from.before(depth)
-  }
-  return $from.depth >= 1 ? $from.before(1) : 0
+  return blockPosAt(editor.state.selection.$from)
 }

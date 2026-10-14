@@ -15,3 +15,8 @@
 - [ ] Slash menu: only block types so far; `/duplicate`, `/delete` and colors (`/red`) come with the color step
 - [ ] Selection toolbar: no color dropdown yet, no comment / @-mention
 - [ ] Slash menu and selection toolbar have no automated tests; the slash popup is placed by hand instead of floating-ui
+- [ ] Block selection: a selection that mixes a heading and a list's items is lifted to the whole list, so it is coarser than Notion's
+- [ ] Block selection: Shift+Up/Down cannot shrink a selection back across a list boundary; Alt+Shift+click (add or remove one block) is not implemented
+- [ ] Block selection: Tab / Shift+Tab nest or un-nest only list items (with the caret in them), not a whole selection or other blocks
+- [ ] Block selection: copying selected blocks copies the text between the first and last block; the margin drag does not auto-scroll
+- [ ] Right-click menu replaces the native one, so spell-check suggestions are not available

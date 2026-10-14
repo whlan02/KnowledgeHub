@@ -295,6 +295,7 @@ fn serve_asset(app: &AppHandle, request: &http::Request<Vec<u8>>) -> http::Respo
 pub fn run() {
     tauri::Builder::default()
         .manage(Workspace::default())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .register_uri_scheme_protocol("kh", |ctx, request| {

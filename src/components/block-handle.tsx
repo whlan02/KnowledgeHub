@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { Editor } from '@tiptap/core'
 import { DragHandle } from '@tiptap/extension-drag-handle-react'
 import { GripVertical, Plus } from 'lucide-react'
-import { currentBlockPos, restoreCursor } from '@/lib/block-actions'
+import { restoreCursor } from '@/lib/block-actions'
+import { blockAtPos, blockPosAt } from '@/lib/block-tree'
+import { selectedBlocks, targetBlocks } from '@/lib/block-selection'
 import { OPEN_BLOCK_MENU_EVENT } from '@/lib/editor-events'
 import { BlockMenu, type BlockMenuState } from '@/components/block-menu'
 
@@ -46,17 +48,21 @@ export function BlockHandle({ editor, notePath }: { editor: Editor; notePath: st
   }, [editor])
 
   const openFromHandle = (kind: BlockMenuState['kind'], button: HTMLElement) => {
-    if (hoveredPosRef.current < 0) return
+    const hovered = blockAtPos(editor.state.doc, hoveredPosRef.current)
+    if (!hovered) return
+    // Acting on a block inside the selection means acting on the whole selection.
+    const selected = selectedBlocks(editor.state)
+    const blocks = selected?.some((block) => block.pos === hovered.pos) ? selected : [hovered]
     const rect = button.getBoundingClientRect()
     setHandleLocked(editor, true)
-    setMenu({ kind, x: rect.right + 4, y: rect.top, pos: hoveredPosRef.current })
+    setMenu({ kind, x: rect.right + 4, y: rect.top, blocks })
   }
 
   const closeMenu = useCallback(
     (restore: boolean) => {
       setHandleLocked(editor, false)
       setMenu((current) => {
-        if (current && restore) restoreCursor(editor, current.pos)
+        if (current && restore) restoreCursor(editor, current.blocks[0].pos)
         return null
       })
     },
@@ -67,21 +73,40 @@ export function BlockHandle({ editor, notePath }: { editor: Editor; notePath: st
   useEffect(() => {
     const dom = editor.view.dom
     const open = () => {
-      const pos = currentBlockPos(editor)
       const caret = editor.view.coordsAtPos(editor.state.selection.from)
       setHandleLocked(editor, true)
-      setMenu({ kind: 'block', x: caret.left, y: caret.bottom + 4, pos })
+      setMenu({ kind: 'block', x: caret.left, y: caret.bottom + 4, blocks: targetBlocks(editor) })
     }
     dom.addEventListener(OPEN_BLOCK_MENU_EVENT, open)
     return () => dom.removeEventListener(OPEN_BLOCK_MENU_EVENT, open)
   }, [editor])
 
+  // Right-click opens the block menu, with clipboard actions, where the pointer is.
+  useEffect(() => {
+    const dom = editor.view.dom
+    const onContextMenu = (event: MouseEvent) => {
+      const hit = editor.view.posAtCoords({ left: event.clientX, top: event.clientY })
+      if (!hit) return
+      event.preventDefault()
+      const block = blockAtPos(editor.state.doc, blockPosAt(editor.state.doc.resolve(hit.pos)))
+      if (!block) return
+      const selected = selectedBlocks(editor.state)
+      const blocks = selected?.some((item) => item.pos === block.pos) ? selected : [block]
+      setHandleLocked(editor, true)
+      setMenu({ kind: 'context', x: event.clientX, y: event.clientY, blocks })
+    }
+    dom.addEventListener('contextmenu', onContextMenu)
+    return () => dom.removeEventListener('contextmenu', onContextMenu)
+  }, [editor])
+
   // Mark the block the menu is about, like Notion's selected-block tint.
   useEffect(() => {
     if (!menu) return
-    const el = editor.view.nodeDOM(menu.pos) as HTMLElement | null
-    el?.classList.add('block-menu-target')
-    return () => el?.classList.remove('block-menu-target')
+    const elements = menu.blocks.map((block) => editor.view.nodeDOM(block.pos) as HTMLElement | null)
+    for (const el of elements) el?.classList.add('block-menu-target')
+    return () => {
+      for (const el of elements) el?.classList.remove('block-menu-target')
+    }
   }, [editor, menu])
 
   return (
