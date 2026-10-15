@@ -51,7 +51,7 @@ KnowledgeHub/
 │   └── lib/           # Backend bridge (backend.ts), TOC, link helpers
 ├── src-tauri/         # Rust backend: workspace scan, file watcher, note read/write, image protocol
 ├── docs/              # Design notes and open issues
-└── .claude/skills/    # Project coding rules (Clean Code Developer, orange grade)
+└── .claude/rules/    # Project coding rules (Clean Code Developer, orange grade), loaded every session
 ```
 
 ## Tech stack

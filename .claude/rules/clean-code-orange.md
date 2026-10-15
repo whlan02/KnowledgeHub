@@ -1,8 +1,3 @@
----
-name: clean-code-orange
-description: KnowledgeHub 的编码规范,基于 Clean Code Developer 橙色等级(Single Level of Abstraction、SRP、Separation of Concerns、代码约定,以及 Issue Tracking、集成测试、Review 实践)。在本项目里编写、修改、重构或评审任何 TypeScript/React/Rust 代码时使用。
----
-
 # Clean Code Developer · 橙色等级
 
 来源:https://clean-code-developer.de/die-grade/orangener-grad/

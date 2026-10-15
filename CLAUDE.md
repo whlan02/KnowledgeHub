@@ -4,9 +4,7 @@
 
 ## 开发规则
 
-编写或修改任何代码时遵循项目 skill `clean-code-orange`(`.claude/skills/clean-code-orange/SKILL.md`),即 Clean Code Developer 橙色等级。每次开始写代码前先用 Skill 工具加载它(技能正文不会自动载入,只有描述会)。
-
-提交前自查:函数只在一个抽象层级;文件/组件/hook 只有一个改动理由(约 300 行为警戒线);基础设施细节不进核心逻辑;命名与周围一致、注释只写“为什么”;遗留问题记到 `docs/issues.md`;改动有测试,功能完成后跑 `/code-review`。
+编码规范是 Clean Code Developer 橙色等级,写在 `.claude/rules/clean-code-orange.md`。它没有 `paths` 限定,每次会话启动时自动载入,不需要手动加载。
 
 ## 常用命令
 
