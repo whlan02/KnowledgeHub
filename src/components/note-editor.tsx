@@ -137,6 +137,7 @@ export function NoteEditor({
       editorProps: {
         attributes: {
           class: 'markdown-body note-editor',
+          spellcheck: 'false',
         },
       },
       onCreate: ({ editor: created }) => {
