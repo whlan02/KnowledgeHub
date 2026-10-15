@@ -1,4 +1,6 @@
-import { createContext, useContext } from 'react'
+import { createContext, useContext, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Check, Copy } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Extension } from '@tiptap/core'
 import {
@@ -17,7 +19,7 @@ import { Plugin } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import GithubSlugger from 'github-slugger'
 import { headingSlugText, scrollHeadingIntoView } from '@/lib/toc'
-import { openExternal } from '@/lib/backend'
+import { openExternal, writeClipboardText } from '@/lib/backend'
 import { encodeNotePath, resolveNoteLink } from '@/lib/utils'
 import {
   BLOCK_TYPES,
@@ -31,6 +33,8 @@ import { loadLastColor } from '@/lib/colors'
 import { OPEN_BLOCK_MENU_EVENT, OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { useNotes } from '@/components/notes-provider'
 import { LinkPreviewAnchor } from '@/components/link-preview-anchor'
+
+const COPIED_FEEDBACK_MS = 1500
 
 /** Which note the editor is showing, for components rendered inside the editor (links, images). */
 export const EditorNoteContext = createContext('')
@@ -141,24 +145,43 @@ export const EditorLinkMark = Link.extend({
 })
 
 
-/** Code block with a language picker; the language is the Markdown fence's info string. */
+/** Code block with a toolbar row on top: language picker and copy button, above the code. */
 function CodeBlockView({ node, updateAttributes, editor }: ReactNodeViewProps) {
+  const { t } = useTranslation()
   const language = String(node.attrs.language ?? '')
+  const [copied, setCopied] = useState(false)
+
+  const copy = async () => {
+    await writeClipboardText(node.textContent)
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), COPIED_FEEDBACK_MS)
+  }
+
   return (
     <NodeViewWrapper className="code-block">
-      <select
-        contentEditable={false}
-        className="code-language"
-        value={language}
-        disabled={!editor.isEditable}
-        onChange={(event) => updateAttributes({ language: event.target.value || null })}
-      >
-        {languageOptions(language).map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      <div className="code-toolbar" contentEditable={false}>
+        <select
+          className="code-language"
+          value={language}
+          disabled={!editor.isEditable}
+          onChange={(event) => updateAttributes({ language: event.target.value || null })}
+        >
+          {languageOptions(language).map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className="code-copy"
+          title={copied ? t('codeCopied') : t('codeCopy')}
+          aria-label={t('codeCopy')}
+          onClick={() => void copy()}
+        >
+          {copied ? <Check /> : <Copy />}
+        </button>
+      </div>
       <pre>
         {/* NodeViewContent is typed for div only, but `pre code` is what the Markdown styles expect. */}
         <NodeViewContent as={'code' as 'div'} />
