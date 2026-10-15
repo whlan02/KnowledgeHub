@@ -8,6 +8,7 @@ import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
 import { GitStatusBar } from '@/components/git-status-bar'
 import { QuickOpen } from '@/components/quick-open'
+import { RecentNotes } from '@/components/recent-notes'
 import { useFileActions } from '@/components/use-file-actions'
 import { WindowControls } from '@/components/window-controls'
 import { Button } from '@/components/ui/button'
@@ -324,6 +325,7 @@ export function AppShell() {
           <div className="min-h-0 flex-1">
             <FileTree renameRequest={renameRequest} />
           </div>
+          <RecentNotes />
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <Outlet />
