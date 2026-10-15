@@ -332,6 +332,17 @@ button:disabled {
   color: var(--foreground);
 }
 
+.markdown-body .code-language {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.markdown-body .code-language svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+
 .markdown-body .code-copy {
   display: flex;
   align-items: center;

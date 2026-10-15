@@ -28,10 +28,10 @@ import {
 } from '@/lib/block-actions'
 import { selectedBlocks, targetBlocks } from '@/lib/block-selection'
 import { colorBlocks, colorSelection } from '@/lib/color-actions'
-import { languageOptions } from '@/lib/code-languages'
 import { loadLastColor } from '@/lib/colors'
 import { OPEN_BLOCK_MENU_EVENT, OPEN_LINK_INPUT_EVENT } from '@/lib/editor-events'
 import { useNotes } from '@/components/notes-provider'
+import { LanguagePicker } from '@/components/language-picker'
 import { LinkPreviewAnchor } from '@/components/link-preview-anchor'
 
 const COPIED_FEEDBACK_MS = 1500
@@ -160,18 +160,11 @@ function CodeBlockView({ node, updateAttributes, editor }: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="code-block">
       <div className="code-toolbar" contentEditable={false}>
-        <select
-          className="code-language"
+        <LanguagePicker
           value={language}
           disabled={!editor.isEditable}
-          onChange={(event) => updateAttributes({ language: event.target.value || null })}
-        >
-          {languageOptions(language).map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          onChange={(id) => updateAttributes({ language: id || null })}
+        />
         <button
           type="button"
           className="code-copy"

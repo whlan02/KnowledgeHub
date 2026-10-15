@@ -68,7 +68,10 @@ export function MenuPanel({
         className,
       )}
       style={position}
-      onMouseDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => {
+        // Keep the editor's focus when a menu item is clicked, but let a search field take focus.
+        if (!(e.target instanceof HTMLInputElement)) e.preventDefault()
+      }}
     >
       {children}
     </div>,
