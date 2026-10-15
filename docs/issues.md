@@ -36,3 +36,4 @@
 - [ ] Renaming reads every note over IPC to rewrite links; move the pass into Rust or prefilter with a text search for big workspaces — `src/components/use-entry-operations.ts`
 - [ ] A link rewrite that fails for one note is only logged; tell the user which notes kept stale links
 - [ ] Git status uses two git calls and `--untracked-files=all` per refresh; merge into one call
+- [ ] Git panel to industry standard (staging groups, diff, history, branches, init, discard with confirmation); steps 1-7 in `docs/git-panel-design.md`, step 8 (push/pull/sync) waits for the user's approval
