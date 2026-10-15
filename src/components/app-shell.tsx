@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Search, Languages, Moon, PanelLeft, RotateCcw, Sun, SunMoon, X } from 'lucide-react'
+import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Search, Languages, Moon, PanelLeft, RotateCcw, Sun, X } from 'lucide-react'
 import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 export function AppShell() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { theme, setTheme } = useTheme()
+  const { resolved, setTheme } = useTheme()
   const {
     folderLabel,
     isDefaultWorkspace,
@@ -260,18 +260,15 @@ export function AppShell() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={t('theme')}>
-                {theme === 'dark' ? <Moon /> : theme === 'light' ? <Sun /> : <SunMoon />}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setTheme('light')}>{t('themeLight')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('dark')}>{t('themeDark')}</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setTheme('system')}>{t('themeSystem')}</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={resolved === 'dark' ? t('themeLight') : t('themeDark')}
+            title={resolved === 'dark' ? t('themeLight') : t('themeDark')}
+            onClick={() => setTheme(resolved === 'dark' ? 'light' : 'dark')}
+          >
+            {resolved === 'dark' ? <Moon /> : <Sun />}
+          </Button>
         </div>
         <WindowControls />
       </header>
