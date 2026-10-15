@@ -1,6 +1,7 @@
 mod assets;
 mod files;
 mod git;
+mod git_history;
 mod paths;
 mod scan;
 mod search;
@@ -166,10 +167,75 @@ fn git_status(state: State<Workspace>) -> Result<git::GitStatus, String> {
     git::status(&current_root(&state)?)
 }
 
-/// Commit every change locally. Nothing is pushed.
+/// Commit what is staged locally. Nothing is pushed.
 #[tauri::command]
-fn git_commit(state: State<Workspace>, message: String) -> Result<(), String> {
-    git::commit_all(&current_root(&state)?, &message)
+fn git_commit(state: State<Workspace>, message: String, amend: bool) -> Result<(), String> {
+    git::commit(&current_root(&state)?, &message, amend)
+}
+
+#[tauri::command]
+fn git_init(state: State<Workspace>) -> Result<(), String> {
+    git::init(&current_root(&state)?)
+}
+
+#[tauri::command]
+fn git_stage(state: State<Workspace>, paths: Vec<String>) -> Result<(), String> {
+    git::stage(&current_root(&state)?, &paths)
+}
+
+#[tauri::command]
+fn git_unstage(state: State<Workspace>, paths: Vec<String>) -> Result<(), String> {
+    git::unstage(&current_root(&state)?, &paths)
+}
+
+/// Throw away all changes to one file; the front end asks the user first.
+#[tauri::command]
+fn git_discard(state: State<Workspace>, path: String) -> Result<(), String> {
+    git::discard(&current_root(&state)?, &path)
+}
+
+#[tauri::command]
+fn git_diff(state: State<Workspace>, path: String, staged: bool, untracked: bool) -> Result<String, String> {
+    git_history::diff(&current_root(&state)?, &path, staged, untracked)
+}
+
+#[tauri::command]
+fn git_log(
+    state: State<Workspace>,
+    path: Option<String>,
+    limit: usize,
+) -> Result<Vec<git_history::CommitInfo>, String> {
+    git_history::log(&current_root(&state)?, path.as_deref(), limit)
+}
+
+#[tauri::command]
+fn git_commit_files(state: State<Workspace>, commit: String) -> Result<Vec<git_history::CommitFile>, String> {
+    git_history::commit_files(&current_root(&state)?, &commit)
+}
+
+#[tauri::command]
+fn git_commit_diff(state: State<Workspace>, commit: String, path: String) -> Result<String, String> {
+    git_history::commit_diff(&current_root(&state)?, &commit, &path)
+}
+
+#[tauri::command]
+fn git_restore_version(state: State<Workspace>, commit: String, path: String) -> Result<(), String> {
+    git_history::restore_version(&current_root(&state)?, &commit, &path)
+}
+
+#[tauri::command]
+fn git_branches(state: State<Workspace>) -> Result<Vec<git_history::Branch>, String> {
+    git_history::branches(&current_root(&state)?)
+}
+
+#[tauri::command]
+fn git_checkout(state: State<Workspace>, name: String) -> Result<(), String> {
+    git_history::checkout(&current_root(&state)?, &name)
+}
+
+#[tauri::command]
+fn git_create_branch(state: State<Workspace>, name: String) -> Result<(), String> {
+    git_history::create_branch(&current_root(&state)?, &name)
 }
 
 fn serve_asset(app: &AppHandle, request: &http::Request<Vec<u8>>) -> http::Response<Vec<u8>> {
@@ -206,7 +272,19 @@ pub fn run() {
             search_notes,
             save_asset,
             git_status,
-            git_commit
+            git_commit,
+            git_init,
+            git_stage,
+            git_unstage,
+            git_discard,
+            git_diff,
+            git_log,
+            git_commit_files,
+            git_commit_diff,
+            git_restore_version,
+            git_branches,
+            git_checkout,
+            git_create_branch
         ])
         .run(tauri::generate_context!())
         .expect("error while running KnowledgeHub");

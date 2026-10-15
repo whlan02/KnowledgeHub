@@ -5,6 +5,7 @@ import './i18n'
 import './index.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { NotesProvider } from '@/components/notes-provider'
+import { GitProvider } from '@/components/git-provider'
 import { AppShell } from '@/components/app-shell'
 import { HomeRedirect } from '@/pages/home-redirect'
 import { NotePage } from '@/pages/note-page'
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
       <NotesProvider>
+        <GitProvider>
         <BrowserRouter>
           <Routes>
             <Route element={<AppShell />}>
@@ -22,6 +24,7 @@ createRoot(document.getElementById('root')!).render(
             </Route>
           </Routes>
         </BrowserRouter>
+        </GitProvider>
       </NotesProvider>
     </ThemeProvider>
   </StrictMode>,

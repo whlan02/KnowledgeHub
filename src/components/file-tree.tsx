@@ -11,9 +11,11 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react'
+import { KIND_COLOR } from '@/lib/git-markers'
 import { buildTree, type TreeNode } from '@/lib/file-tree-model'
 import { isInside, nameOf, parentOf } from '@/lib/path-ops'
 import { cn, encodeNotePath } from '@/lib/utils'
+import { useGit } from '@/components/git-provider'
 import { MenuItem, MenuPanel } from '@/components/menu-panel'
 import { useNotes } from '@/components/notes-provider'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -86,6 +88,19 @@ function canDrop(dragged: string | null, folder: string) {
   return dragged !== null && parentOf(dragged) !== folder && !isInside(folder, dragged)
 }
 
+/** Small dot for a note or folder with uncommitted changes (a folder when anything inside changed). */
+function ChangeDot({ path }: { path: string }) {
+  const { t } = useTranslation()
+  const kind = useGit().markers.get(path)
+  if (!kind) return null
+  return (
+    <span
+      title={t(`gitKind_${kind}`)}
+      className={cn('ml-auto size-1.5 shrink-0 rounded-full bg-current', KIND_COLOR[kind])}
+    />
+  )
+}
+
 function TreeItem({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: TreeContext }) {
   const isDir = !node.note
   const open = ctx.expanded.has(node.path)
@@ -144,6 +159,7 @@ function TreeItem({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: Tr
           {open ? <ChevronDown className="size-3.5 shrink-0" /> : <ChevronRight className="size-3.5 shrink-0" />}
           <Folder className="size-3.5 shrink-0 opacity-70" />
           <span className="truncate">{node.name}</span>
+          <ChangeDot path={node.path} />
         </button>
         {open &&
           node.children.map((child) => <TreeItem key={child.path} node={child} depth={depth + 1} ctx={ctx} />)}
@@ -167,6 +183,7 @@ function TreeItem({ node, depth, ctx }: { node: TreeNode; depth: number; ctx: Tr
     >
       <FileText className="size-3.5 shrink-0 opacity-70" />
       <span className="truncate">{node.note!.title}</span>
+      <ChangeDot path={node.path} />
     </NavLink>
   )
 }

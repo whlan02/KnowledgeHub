@@ -30,10 +30,12 @@
 - [ ] Next up (autonomous plan): code block language picker, table row/column actions, equations, bookmarks, page appearance, release build + desktop shortcut
 - [ ] Link rewriting on rename skips links whose target has spaces or parentheses written raw, and reference-style links (`[a]: b.md`) — `src/lib/link-rewrite.ts`
 - [ ] Git bar is hidden when the workspace is a subfolder of a larger repository (only a `.git` in the workspace root counts) — `src-tauri/src/git.rs`
-- [ ] Git: no init button for a workspace that is not a repository, no push or pull (push/pull need the user's approval first)
+- [ ] Git: no push, pull or ahead/behind counts (needs the user's approval first)
 - [ ] Code blocks have a language picker but no syntax highlighting (would need lowlight)
 - [ ] The code block picker view (`EditorCodeBlock`) has no rendering test, only Markdown round-trip tests
 - [ ] Renaming reads every note over IPC to rewrite links; move the pass into Rust or prefilter with a text search for big workspaces — `src/components/use-entry-operations.ts`
 - [ ] A link rewrite that fails for one note is only logged; tell the user which notes kept stale links
-- [ ] Git status uses two git calls and `--untracked-files=all` per refresh; merge into one call
-- [ ] Git panel to industry standard (staging groups, diff, history, branches, init, discard with confirmation); steps 1-7 in `docs/git-panel-design.md`, step 8 (push/pull/sync) waits for the user's approval
+- [x] Git status uses two git calls per refresh; merged into one (`status --branch`); `--untracked-files=all` stays
+- [x] Git panel to industry standard: staging groups, inline diff, history (also per file) with restore, branch menu, init, discard with confirmation — steps 1-7 of `docs/git-panel-design.md`; step 8 (push/pull/sync) waits for the user's approval
+- [ ] Git panel leftovers: tree view of changes, side-by-side diff, stage by hunk, editor gutter marks for changed lines, drag-and-drop staging, right-click menu on change rows, no rendering tests for the history tab — `src/components/git-*.tsx`
+- [ ] Git panel: discarding a staged rename trashes the new name but does not restore the old file; the selected file's diff is re-read on every status refresh; panel components fetch data inline instead of via hooks — `src-tauri/src/git.rs`, `src/components/git-*-tab.tsx`

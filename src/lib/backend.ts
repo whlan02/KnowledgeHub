@@ -84,20 +84,80 @@ export function deleteEntry(path: string) {
   return invoke<void>('delete_entry', { path })
 }
 
+export type GitChangeKind = 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
 export type GitChange = {
   path: string
-  kind: 'added' | 'modified' | 'deleted' | 'renamed' | 'untracked'
+  kind: GitChangeKind
+  /** What is staged for the next commit. */
+  staged: GitChangeKind | null
+  /** What changed in the working tree since (untracked files included). */
+  unstaged: GitChangeKind | null
 }
 export type GitStatus = { branch: string | null; changes: GitChange[] }
+export type GitCommitInfo = { hash: string; short: string; author: string; time: number; summary: string }
+export type GitCommitFile = { path: string; kind: GitChangeKind }
+export type GitBranch = { name: string; current: boolean }
 
 /** Branch and changed files; rejects with NOT_A_REPO when the workspace is not under Git. */
 export function gitStatus() {
   return invoke<GitStatus>('git_status')
 }
 
-/** Commit every change locally. Nothing is pushed. */
-export function gitCommit(message: string) {
-  return invoke<void>('git_commit', { message })
+export function gitInit() {
+  return invoke<void>('git_init')
+}
+
+export function gitStage(paths: string[]) {
+  return invoke<void>('git_stage', { paths })
+}
+
+export function gitUnstage(paths: string[]) {
+  return invoke<void>('git_unstage', { paths })
+}
+
+/** Throw away every change to one file. Callers must ask the user first. */
+export function gitDiscard(path: string) {
+  return invoke<void>('git_discard', { path })
+}
+
+/** Commit what is staged (or rewrite the last commit). Nothing is pushed. */
+export function gitCommit(message: string, amend: boolean) {
+  return invoke<void>('git_commit', { message, amend })
+}
+
+/** Unified diff of one file; `staged` compares against HEAD, otherwise against the index. */
+export function gitDiff(path: string, staged: boolean, untracked: boolean) {
+  return invoke<string>('git_diff', { path, staged, untracked })
+}
+
+/** Newest first; `path` limits it to one file's history. */
+export function gitLog(path: string | null, limit: number) {
+  return invoke<GitCommitInfo[]>('git_log', { path, limit })
+}
+
+export function gitCommitFiles(commit: string) {
+  return invoke<GitCommitFile[]>('git_commit_files', { commit })
+}
+
+export function gitCommitDiff(commit: string, path: string) {
+  return invoke<string>('git_commit_diff', { commit, path })
+}
+
+/** Rewrite one file as it was in `commit`; the result is an ordinary uncommitted change. */
+export function gitRestoreVersion(commit: string, path: string) {
+  return invoke<void>('git_restore_version', { commit, path })
+}
+
+export function gitBranches() {
+  return invoke<GitBranch[]>('git_branches')
+}
+
+export function gitCheckout(name: string) {
+  return invoke<void>('git_checkout', { name })
+}
+
+export function gitCreateBranch(name: string) {
+  return invoke<void>('git_create_branch', { name })
 }
 
 /** Native yes/no dialog. */
