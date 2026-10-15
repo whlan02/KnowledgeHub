@@ -22,7 +22,7 @@ export function GitDiffView({ diff, error }: { diff: string | null; error?: stri
   if (lines.length === 0) return <p className="p-3 text-xs text-muted-foreground">{t('gitNoDiff')}</p>
 
   return (
-    <pre className="max-h-64 overflow-auto py-1 font-mono text-[11px] leading-5">
+    <pre className="max-h-[40vh] overflow-auto py-1 font-mono text-[11px] leading-5">
       {lines.map((line, i) => (
         <div key={i} className={cn('whitespace-pre-wrap break-all px-3', LINE_STYLE[line.kind])}>
           <span className="mr-2 inline-block w-2 select-none text-muted-foreground">{LINE_SIGN[line.kind]}</span>

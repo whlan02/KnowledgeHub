@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GitProvider } from '@/components/git-provider'
+import { GitPanel } from '@/components/git-panel'
 import { GitStatusBar } from '@/components/git-status-bar'
 
 const mocks = vi.hoisted(() => ({
@@ -53,10 +55,20 @@ const modified = { path: 'a.md', kind: 'modified', staged: null, unstaged: 'modi
 const stagedFile = { path: 'a.md', kind: 'modified', staged: 'modified', unstaged: null }
 const dirty = { branch: 'master', changes: [modified] }
 
+function Harness() {
+  const [panelOpen, setPanelOpen] = useState(false)
+  return (
+    <>
+      {panelOpen && <GitPanel />}
+      <GitStatusBar onShowChanges={() => setPanelOpen((open) => !open)} />
+    </>
+  )
+}
+
 function renderBar() {
   return render(
     <GitProvider>
-      <GitStatusBar />
+      <Harness />
     </GitProvider>,
   )
 }
@@ -166,20 +178,6 @@ describe('GitStatusBar', () => {
     fireEvent.change(screen.getByPlaceholderText('gitSummaryPlaceholder'), { target: { value: 'x' } })
     await act(async () => fireEvent.click(screen.getByRole('button', { name: /gitCommit/ })))
     expect(screen.getByText('Author identity unknown')).toBeTruthy()
-  })
-
-  it('closes the panel when the change count is clicked again', async () => {
-    mocks.status.mockResolvedValue(dirty)
-    renderBar()
-    const toggle = await screen.findByText('gitChanges:1')
-    const press = () => {
-      fireEvent.pointerDown(toggle)
-      fireEvent.click(toggle)
-    }
-    press()
-    expect(screen.queryByPlaceholderText('gitSummaryPlaceholder')).not.toBeNull()
-    press()
-    expect(screen.queryByPlaceholderText('gitSummaryPlaceholder')).toBeNull()
   })
 
   it('switches branch after confirming because changes are uncommitted', async () => {

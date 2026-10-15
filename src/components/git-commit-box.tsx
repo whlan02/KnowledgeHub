@@ -38,7 +38,7 @@ export function GitCommitBox({ stagedCount, onCommitted }: { stagedCount: number
   }
 
   return (
-    <div className="space-y-2 border-t p-3">
+    <div className="shrink-0 space-y-2 border-t p-3">
       <div className="relative">
         <input
           value={summary}

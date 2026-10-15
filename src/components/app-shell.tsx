@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { BookOpen, ChevronDown, FilePlus, FolderOpen, FolderPlus, Search, Languages, Moon, PanelLeft, RotateCcw, Sun, X } from 'lucide-react'
+import { BookOpen, ChevronDown, FilePlus, Files, FolderOpen, GitBranch, FolderPlus, Search, Languages, Moon, PanelLeft, RotateCcw, Sun, X } from 'lucide-react'
 import i18n from '@/i18n'
 import { useTheme } from '@/components/theme-provider'
 import { useNotes } from '@/components/notes-provider'
 import { FileTree } from '@/components/file-tree'
+import { GitPanel } from '@/components/git-panel'
 import { GitStatusBar } from '@/components/git-status-bar'
 import { QuickOpen } from '@/components/quick-open'
 import { RecentNotes } from '@/components/recent-notes'
@@ -43,6 +44,7 @@ export function AppShell() {
   const fileActions = useFileActions()
   const [renameRequest, setRenameRequest] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarMode, setSidebarMode] = useState<'files' | 'git'>('files')
   const [searchOpen, setSearchOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -277,9 +279,33 @@ export function AppShell() {
         <aside
           className={cn(
             'flex shrink-0 flex-col border-r bg-sidebar transition-[width] duration-200',
-            sidebarOpen ? 'w-[280px]' : 'w-0 overflow-hidden border-r-0',
+            !sidebarOpen ? 'w-0 overflow-hidden border-r-0' : sidebarMode === 'git' ? 'w-[380px]' : 'w-[280px]',
           )}
         >
+          <div className="flex shrink-0 gap-1 border-b px-2 py-1.5">
+            {(
+              [
+                ['files', Files, t('files')],
+                ['git', GitBranch, t('gitPanelTitle')],
+              ] as const
+            ).map(([mode, Icon, label]) => (
+              <Button
+                key={mode}
+                variant={sidebarMode === mode ? 'secondary' : 'ghost'}
+                size="icon"
+                className="size-7"
+                aria-label={label}
+                title={label}
+                onClick={() => setSidebarMode(mode)}
+              >
+                <Icon />
+              </Button>
+            ))}
+          </div>
+          {sidebarMode === 'git' ? (
+            <GitPanel />
+          ) : (
+            <>
           <div className="flex items-center gap-1 px-3 py-2">
             <div className="min-w-0 flex-1">
               <div className="text-xs font-medium tracking-wide text-muted-foreground">{t('files')}</div>
@@ -323,12 +349,19 @@ export function AppShell() {
             <FileTree renameRequest={renameRequest} />
           </div>
           <RecentNotes />
+            </>
+          )}
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <Outlet />
         </main>
       </div>
-      <GitStatusBar />
+      <GitStatusBar
+        onShowChanges={() => {
+          setSidebarMode('git')
+          setSidebarOpen(true)
+        }}
+      />
       <QuickOpen open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   )

@@ -103,7 +103,7 @@ export function GitHistoryTab({ path, onClearPath }: { path: string | null; onCl
           </button>
         </div>
       )}
-      <ul className="max-h-48 overflow-y-auto">
+      <ul className="min-h-24 flex-1 overflow-y-auto">
         {commits.length === 0 && <li className="px-3 py-4 text-xs text-muted-foreground">{t('gitNoCommits')}</li>}
         {commits.map((c) => (
           <li
@@ -121,7 +121,7 @@ export function GitHistoryTab({ path, onClearPath }: { path: string | null; onCl
         ))}
       </ul>
       {commit && (
-        <div className="border-t">
+        <div className="shrink-0 border-t">
           <ul className="max-h-24 overflow-y-auto">
             {files.map((f) => (
               <li

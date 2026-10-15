@@ -154,7 +154,7 @@ export function GitChangesTab({ onShowHistory }: { onShowHistory: (path: string)
           className="w-full rounded-md border bg-background px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring"
         />
       </div>
-      <div className="max-h-52 overflow-y-auto">
+      <div className="min-h-24 flex-1 overflow-y-auto">
         <ChangeGroup
           title={t('gitStaged')}
           entries={staged}
@@ -183,7 +183,7 @@ export function GitChangesTab({ onShowHistory }: { onShowHistory: (path: string)
       </div>
       {error && <p className="select-text whitespace-pre-wrap px-3 py-1 text-xs text-destructive">{error}</p>}
       {selected && (
-        <div className="border-t">
+        <div className="shrink-0 border-t">
           <GitDiffView diff={diff} error={diffError} />
         </div>
       )}
