@@ -148,6 +148,11 @@ export function gitRestoreVersion(commit: string, path: string) {
   return invoke<void>('git_restore_version', { commit, path })
 }
 
+/** The note as committed in HEAD; null when HEAD does not have it (new file or no commits yet). */
+export function gitHeadContent(path: string) {
+  return invoke<string | null>('git_head_content', { path })
+}
+
 export function gitBranches() {
   return invoke<GitBranch[]>('git_branches')
 }

@@ -173,7 +173,7 @@ pub fn commit(root: &Path, message: &str, amend: bool) -> Result<(), String> {
     git(root, &args).map(|_| ())
 }
 
-fn is_tracked_in_head(root: &Path, path: &str) -> bool {
+pub fn is_tracked_in_head(root: &Path, path: &str) -> bool {
     git(root, &["cat-file", "-e", &format!("HEAD:{path}")]).is_ok()
 }
 

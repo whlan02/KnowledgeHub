@@ -8,7 +8,9 @@ import { BlockHandle } from '@/components/block-handle'
 import { BlockMarquee } from '@/components/block-marquee'
 import { SelectionToolbar } from '@/components/selection-toolbar'
 import { SlashCommand } from '@/components/slash-menu'
+import { ChangeMarksController } from '@/components/use-change-marks'
 import { BlockSelection } from '@/lib/block-selection'
+import { ChangeMarksExtension } from '@/lib/change-marks-extension'
 import { documentExtensions } from '@/lib/document-extensions'
 import { saveAsset } from '@/lib/backend'
 import { fileErrorKey } from '@/lib/file-errors'
@@ -131,6 +133,7 @@ export function NoteEditor({
         BlockShortcuts,
         SlashCommand,
         BlockSelection,
+        ChangeMarksExtension,
       ],
       content: initialContent,
       contentType: 'markdown',
@@ -208,6 +211,7 @@ export function NoteEditor({
         <EditorContent editor={editor} />
         {editor && <BlockHandle editor={editor} notePath={notePath} />}
         {editor && <BlockMarquee editor={editor} />}
+        {editor && <ChangeMarksController editor={editor} notePath={notePath} />}
         {editor && <SelectionToolbar editor={editor} />}
       </div>
     </EditorNoteContext.Provider>

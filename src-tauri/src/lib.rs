@@ -223,6 +223,12 @@ fn git_restore_version(state: State<Workspace>, commit: String, path: String) ->
     git_history::restore_version(&current_root(&state)?, &commit, &path)
 }
 
+/// The note as committed in HEAD, for marking changed blocks in the editor.
+#[tauri::command]
+fn git_head_content(state: State<Workspace>, path: String) -> Result<Option<String>, String> {
+    git_history::head_content(&current_root(&state)?, &path)
+}
+
 #[tauri::command]
 fn git_branches(state: State<Workspace>) -> Result<Vec<git_history::Branch>, String> {
     git_history::branches(&current_root(&state)?)
@@ -282,6 +288,7 @@ pub fn run() {
             git_commit_files,
             git_commit_diff,
             git_restore_version,
+            git_head_content,
             git_branches,
             git_checkout,
             git_create_branch

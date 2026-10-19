@@ -1,4 +1,4 @@
-use crate::git::{ensure_repo, git, git_with_paths, has_commits};
+use crate::git::{ensure_repo, git, git_with_paths, has_commits, is_tracked_in_head};
 use crate::paths::safe_join;
 use serde::Serialize;
 use std::{fs, path::Path};
@@ -133,6 +133,16 @@ pub fn restore_version(root: &Path, commit: &str, path: &str) -> Result<(), Stri
     git_with_paths(root, &["restore", &source, "--worktree"], &[path.to_string()]).map(|_| ())
 }
 
+/// The note as committed in HEAD; `None` when HEAD does not have it (new file, or no commits yet).
+pub fn head_content(root: &Path, path: &str) -> Result<Option<String>, String> {
+    ensure_repo(root)?;
+    safe_join(root, path)?;
+    if !has_commits(root) || !is_tracked_in_head(root, path) {
+        return Ok(None);
+    }
+    git(root, &["show", &format!("HEAD:{path}")]).map(Some)
+}
+
 pub fn branches(root: &Path) -> Result<Vec<Branch>, String> {
     ensure_repo(root)?;
     let out = git(root, &["branch", "--format=%(HEAD)%(refname:short)"])?;
@@ -232,6 +242,23 @@ mod tests {
         restore_version(&dir.0, first, "a.md").unwrap();
         assert_eq!(std::fs::read_to_string(dir.0.join("a.md")).unwrap(), "old\n");
         assert!(restore_version(&dir.0, "-x", "a.md").is_err());
+    }
+
+    #[test]
+    fn head_content_is_the_committed_text_or_none() {
+        let dir = repo("hist-head");
+        assert_eq!(head_content(&dir.0, "a.md").unwrap(), None);
+        commit_file(&dir, "a.md", "committed
+", "add a");
+        dir.file("a.md", "edited
+");
+        assert_eq!(head_content(&dir.0, "a.md").unwrap().as_deref(), Some("committed
+"));
+        dir.file("new.md", "x");
+        assert_eq!(head_content(&dir.0, "new.md").unwrap(), None);
+        assert!(head_content(&dir.0, "../a.md").is_err());
+        let not_repo = Scratch::new("hist-head-norepo");
+        assert!(head_content(&not_repo.0, "a.md").is_err());
     }
 
     #[test]
